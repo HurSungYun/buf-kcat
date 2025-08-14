@@ -1,10 +1,10 @@
 # buf-kcat
 
-A Kafka consumer CLI tool with automatic protobuf decoding using buf. Combines the functionality of kafkacat/kcat with automatic protobuf message decoding for better debugging and monitoring.
+A Kafka consumer CLI tool with protobuf decoding using buf. Combines the functionality of [kafkacat/kcat](https://github.com/edenhill/kcat) with protobuf message decoding for better debugging and monitoring.
 
 ## Features
 
-- 🚀 **Automatic protobuf decoding** - Decodes Kafka messages using protobuf definitions
+- 🚀 **Protobuf decoding** - Decodes Kafka messages using protobuf definitions
 - 📦 **buf.yaml support** - Automatically uses buf for proto compilation if available
 - 🎨 **Multiple output formats** - JSON, table, pretty, raw formats
 - 🔧 **Familiar kafkacat interface** - Similar command-line options
@@ -181,4 +181,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-If you find buf-kcat useful, please consider giving it a ⭐ on GitHub!
+If you find `buf-kcat` useful, please consider giving it a ⭐ on GitHub!
