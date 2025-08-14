@@ -78,6 +78,23 @@ func runConsume(cmd *cobra.Command, args []string) {
 		cancel()
 	}()
 
+	// Print connection status
+	fmt.Fprintf(os.Stderr, "Connected to Kafka brokers: %v\n", brokers)
+	fmt.Fprintf(os.Stderr, "Starting to consume from topic '%s' (group: %s, offset: %s)\n", topic, group, offset)
+	if messageType != "" {
+		fmt.Fprintf(os.Stderr, "Message type: %s\n", messageType)
+	}
+	if keyFilter != "" {
+		fmt.Fprintf(os.Stderr, "Filtering by key: %s\n", keyFilter)
+	}
+	if count > 0 {
+		fmt.Fprintf(os.Stderr, "Will consume %d messages\n", count)
+	}
+	if follow {
+		fmt.Fprintf(os.Stderr, "Following topic (press Ctrl+C to stop)...\n")
+	}
+	fmt.Fprintf(os.Stderr, "Waiting for messages...\n\n")
+
 	// Consume messages
 	messageCount := 0
 	for {
