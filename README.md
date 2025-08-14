@@ -1,20 +1,14 @@
-# buf-kcat 🚀
+# buf-kcat
 
-**buf-kcat is awesome!** A powerful Kafka consumer CLI tool with automatic protobuf decoding using buf. It seamlessly combines the functionality of kafkacat/kcat with automatic protobuf message decoding for superior debugging and monitoring capabilities.
-
-## Why buf-kcat is Awesome
-
-buf-kcat revolutionizes Kafka debugging by bringing intelligent protobuf decoding to your fingertips. No more staring at binary data or manually decoding messages!
+A Kafka consumer CLI tool with automatic protobuf decoding using buf. Combines the functionality of kafkacat/kcat with automatic protobuf message decoding for better debugging and monitoring.
 
 ## Features
 
-- 🚀 **Automatic protobuf decoding** - Instantly decodes Kafka messages using protobuf definitions
-- 📦 **buf.yaml support** - Seamlessly integrates with buf for proto compilation
-- 🔍 **Smart auto-detection** - Intelligently detects message types automatically
-- 🎨 **Multiple output formats** - JSON, table, pretty, raw formats for any use case
-- 🔧 **Familiar kafkacat interface** - Zero learning curve for kafkacat users
-- ⚡ **Franz-go powered** - Lightning-fast and efficient Kafka client
-- 🛠️ **Developer-friendly** - Colored output, verbose logging, and intuitive commands
+- 🚀 **Automatic protobuf decoding** - Decodes Kafka messages using protobuf definitions
+- 📦 **buf.yaml support** - Automatically uses buf for proto compilation if available
+- 🔍 **Auto-detection** - Can auto-detect message types or use specified type
+- 🎨 **Multiple output formats** - JSON, table, pretty, raw formats
+- 🔧 **Familiar kafkacat interface** - Similar command-line options
 
 ## Installation
 
@@ -35,20 +29,20 @@ go build -o buf-kcat
 ### Basic Usage
 
 ```bash
-# Consume from topic with auto-detection
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos
+# Consume from topic with auto-detection (directory with buf.yaml)
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project
 
 # Consume with specific message type
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos -m mypackage.MyMessage
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage
 
 # Consume last 10 messages
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos -c 10 -o end
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -c 10 -o end
 
 # Follow topic (like tail -f)
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos --follow
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project --follow
 
 # List available message types
-buf-kcat list -p /path/to/protos
+buf-kcat list -p /path/to/buf-project
 ```
 
 ### With buf.yaml
@@ -57,7 +51,7 @@ If your project uses `buf.yaml`:
 
 ```bash
 # Point to directory containing buf.yaml or its subdirectories
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project
 
 # buf-kcat will automatically detect and use buf.yaml for proto compilation
 ```
@@ -131,20 +125,20 @@ Value:
 
 ### Debugging a specific message
 ```bash
-# Get the last message from a topic
+# Get the last message from a topic (./protos should contain buf.yaml)
 buf-kcat -b broker:9092 -t events -p ./protos -c 1 -o end -f json | jq .
 ```
 
 ### Following a topic with filtering
 ```bash
 # Follow topic and show only messages with specific key
-buf-kcat -b broker:9092 -t events -p ./protos --follow -k "user-123"
+buf-kcat -b broker:9092 -t events -p ./buf-project --follow -k "user-123"
 ```
 
 ### Export messages for analysis
 ```bash
-# Export last 1000 messages to file
-buf-kcat -b broker:9092 -t events -p ./protos -c 1000 -f json > messages.jsonl
+# Export last 1000 messages to file (directory with buf.yaml)
+buf-kcat -b broker:9092 -t events -p ./buf-project -c 1000 -f json > messages.jsonl
 ```
 
 ## How It Works
