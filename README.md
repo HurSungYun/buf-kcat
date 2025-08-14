@@ -1,15 +1,20 @@
-# buf-kcat
+# buf-kcat 🚀
 
-A Kafka consumer CLI tool with automatic protobuf decoding using buf. Combines the functionality of kafkacat/kcat with automatic protobuf message decoding for better debugging and monitoring.
+**buf-kcat is awesome!** A powerful Kafka consumer CLI tool with automatic protobuf decoding using buf. It seamlessly combines the functionality of kafkacat/kcat with automatic protobuf message decoding for superior debugging and monitoring capabilities.
+
+## Why buf-kcat is Awesome
+
+buf-kcat revolutionizes Kafka debugging by bringing intelligent protobuf decoding to your fingertips. No more staring at binary data or manually decoding messages!
 
 ## Features
 
-- 🚀 **Automatic protobuf decoding** - Decodes Kafka messages using protobuf definitions
-- 📦 **buf.yaml support** - Automatically uses buf for proto compilation if available
-- 🔍 **Auto-detection** - Can auto-detect message types or use specified type
-- 🎨 **Multiple output formats** - JSON, table, pretty, raw formats
-- 🔧 **Familiar kafkacat interface** - Similar command-line options
-- ⚡ **Franz-go powered** - Fast and efficient Kafka client
+- 🚀 **Automatic protobuf decoding** - Instantly decodes Kafka messages using protobuf definitions
+- 📦 **buf.yaml support** - Seamlessly integrates with buf for proto compilation
+- 🔍 **Smart auto-detection** - Intelligently detects message types automatically
+- 🎨 **Multiple output formats** - JSON, table, pretty, raw formats for any use case
+- 🔧 **Familiar kafkacat interface** - Zero learning curve for kafkacat users
+- ⚡ **Franz-go powered** - Lightning-fast and efficient Kafka client
+- 🛠️ **Developer-friendly** - Colored output, verbose logging, and intuitive commands
 
 ## Installation
 
@@ -52,7 +57,7 @@ If your project uses `buf.yaml`:
 
 ```bash
 # Point to directory containing buf.yaml or its subdirectories
-buf-kcat -b localhost:9092 -t my-topic -p /Users/lambert/workspace/idl
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos
 
 # buf-kcat will automatically detect and use buf.yaml for proto compilation
 ```
@@ -178,6 +183,14 @@ buf-kcat -b broker:9092 -t events -p ./protos -c 1000 -f json > messages.jsonl
 | JSON output | ✅ | ✅ |
 | Colored output | ❌ | ✅ |
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Support
+
+If you find buf-kcat useful, please consider giving it a ⭐ on GitHub!
