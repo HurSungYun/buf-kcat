@@ -229,22 +229,12 @@ func (d *Decoder) loadMessage(msg protoreflect.MessageDescriptor) {
 }
 
 func (d *Decoder) Decode(data []byte) ([]byte, string, error) {
-	// If a specific message type is set, use it
-	if d.defaultType != "" {
-		return d.decodeWithType(data, d.defaultType)
+	// Message type is required
+	if d.defaultType == "" {
+		return nil, "", fmt.Errorf("message type is required")
 	}
 
-	// Try to auto-detect by attempting to decode with different message types
-	// This is a heuristic approach - try types that are likely to be Kafka messages
-	candidateTypes := d.findCandidateTypes()
-	
-	for _, typeName := range candidateTypes {
-		if result, _, err := d.decodeWithType(data, typeName); err == nil {
-			return result, typeName, nil
-		}
-	}
-
-	return nil, "", fmt.Errorf("failed to auto-detect message type")
+	return d.decodeWithType(data, d.defaultType)
 }
 
 func (d *Decoder) decodeWithType(data []byte, typeName string) ([]byte, string, error) {
@@ -274,28 +264,6 @@ func (d *Decoder) decodeWithType(data []byte, typeName string) ([]byte, string, 
 	return jsonData, typeName, nil
 }
 
-func (d *Decoder) findCandidateTypes() []string {
-	// Prioritize message types that are likely to be Kafka messages
-	var candidates []string
-	var others []string
-
-	for typeName := range d.messageTypes {
-		lower := strings.ToLower(typeName)
-		// Prioritize types with these keywords
-		if strings.Contains(lower, "event") ||
-			strings.Contains(lower, "message") ||
-			strings.Contains(lower, "envelope") ||
-			strings.Contains(lower, "wrapper") ||
-			strings.Contains(lower, "kafka") {
-			candidates = append(candidates, typeName)
-		} else {
-			others = append(others, typeName)
-		}
-	}
-
-	// Append others at the end
-	return append(candidates, others...)
-}
 
 func (d *Decoder) MessageTypeCount() int {
 	return len(d.messageTypes)

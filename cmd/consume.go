@@ -25,11 +25,7 @@ func runConsume(cmd *cobra.Command, args []string) {
 
 	if verbose {
 		fmt.Fprintf(os.Stderr, "Loaded %d message types from %s\n", dec.MessageTypeCount(), protoDir)
-		if messageType != "" {
-			fmt.Fprintf(os.Stderr, "Using message type: %s\n", messageType)
-		} else {
-			fmt.Fprintf(os.Stderr, "Auto-detecting message type\n")
-		}
+		fmt.Fprintf(os.Stderr, "Using message type: %s\n", messageType)
 	}
 
 	// Initialize formatter

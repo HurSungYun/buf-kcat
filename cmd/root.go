@@ -30,11 +30,8 @@ using buf.yaml configuration. It combines the functionality of kafkacat with
 automatic protobuf decoding for better debugging and monitoring.
 
 Examples:
-  # Consume from topic with auto-detection
-  buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos
-
-  # Consume with specific message type
-  buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos -m mypackage.MyMessage
+  # Consume from topic with specific message type
+  buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage
 
   # Consume last 10 messages
   buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos -c 10 -o end
@@ -60,7 +57,7 @@ func init() {
 	rootCmd.Flags().StringSliceVarP(&brokers, "brokers", "b", []string{"localhost:9092"}, "Kafka brokers (comma-separated)")
 	rootCmd.Flags().StringVarP(&topic, "topic", "t", "", "Kafka topic (required)")
 	rootCmd.Flags().StringVarP(&group, "group", "g", "buf-kcat", "Consumer group")
-	rootCmd.Flags().StringVarP(&messageType, "message-type", "m", "", "Protobuf message type (auto-detect if not specified)")
+	rootCmd.Flags().StringVarP(&messageType, "message-type", "m", "", "Protobuf message type (required)")
 	rootCmd.Flags().StringVarP(&outputFormat, "format", "f", "pretty", "Output format: json, json-compact, table, raw, pretty")
 	rootCmd.Flags().StringVarP(&offset, "offset", "o", "end", "Start offset: beginning, end, stored, or timestamp:UNIX_MS")
 	rootCmd.Flags().IntVarP(&count, "count", "c", 0, "Number of messages to consume (0 = unlimited)")
@@ -68,6 +65,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
 
 	rootCmd.MarkFlagRequired("topic")
+	rootCmd.MarkFlagRequired("message-type")
 }
 
 func init() {
