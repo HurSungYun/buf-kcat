@@ -63,7 +63,7 @@ jobs:
           go build -v -o buf-kcat-${{ matrix.goos }}-${{ matrix.goarch }} .
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: buf-kcat-${{ matrix.goos }}-${{ matrix.goarch }}
           path: buf-kcat-${{ matrix.goos }}-${{ matrix.goarch }}

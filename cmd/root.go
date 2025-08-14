@@ -30,14 +30,14 @@ using buf.yaml configuration. It combines the functionality of kafkacat with
 automatic protobuf decoding for better debugging and monitoring.
 
 Examples:
-  # Consume from topic with specific message type
-  buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage
+  # Consume from topic with buf.yaml
+  buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
 
   # Consume last 10 messages
-  buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos -c 10 -o end
+  buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage -c 10 -o end
 
   # Follow topic (like tail -f)
-  buf-kcat -b localhost:9092 -t my-topic -p /path/to/protos --follow`,
+  buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage --follow`,
 	Run: runConsume,
 }
 
@@ -50,7 +50,7 @@ func Execute() {
 
 func init() {
 	// Persistent flags (available to all commands)
-	rootCmd.PersistentFlags().StringVarP(&protoDir, "proto", "p", ".", "Directory containing buf.yaml or proto files")
+	rootCmd.PersistentFlags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 	
 	// Flags specific to consume command

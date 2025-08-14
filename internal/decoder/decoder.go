@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -23,58 +22,40 @@ type Decoder struct {
 	defaultType  string
 }
 
-func NewDecoder(protoDir string, messageType string) (*Decoder, error) {
+func NewDecoder(bufYamlPath string, messageType string) (*Decoder, error) {
 	d := &Decoder{
 		messageTypes: make(map[string]protoreflect.MessageType),
 		registry:     new(protoregistry.Files),
 		defaultType:  messageType,
 	}
 
-	if err := d.loadProtos(protoDir); err != nil {
+	if err := d.loadWithBuf(bufYamlPath); err != nil {
 		return nil, err
 	}
 
 	return d, nil
 }
 
-func (d *Decoder) loadProtos(protoDir string) error {
-	// Check for buf.yaml
-	if d.hasBufYaml(protoDir) {
-		return d.loadWithBuf(protoDir)
-	}
-	return d.loadWithProtoc(protoDir)
-}
 
-func (d *Decoder) hasBufYaml(dir string) bool {
-	checkDirs := []string{
-		dir,
-		filepath.Dir(dir),
-		filepath.Dir(filepath.Dir(dir)),
+
+func (d *Decoder) loadWithBuf(bufYamlPath string) error {
+	// Validate that the file exists and is buf.yaml
+	if filepath.Base(bufYamlPath) != "buf.yaml" {
+		return fmt.Errorf("expected buf.yaml file, got: %s", bufYamlPath)
+	}
+	
+	if _, err := os.Stat(bufYamlPath); err != nil {
+		return fmt.Errorf("buf.yaml not found: %w", err)
 	}
 
-	for _, checkDir := range checkDirs {
-		if _, err := os.Stat(filepath.Join(checkDir, "buf.yaml")); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-func (d *Decoder) loadWithBuf(protoDir string) error {
 	tempDir := filepath.Join(os.TempDir(), "buf-kcat-descriptors")
 	os.MkdirAll(tempDir, 0755)
 	defer os.RemoveAll(tempDir)
 
 	descriptorFile := filepath.Join(tempDir, "image.bin")
 
-	// Find the directory with buf.yaml
-	bufDir := protoDir
-	for _, dir := range []string{protoDir, filepath.Dir(protoDir), filepath.Dir(filepath.Dir(protoDir))} {
-		if _, err := os.Stat(filepath.Join(dir, "buf.yaml")); err == nil {
-			bufDir = dir
-			break
-		}
-	}
+	// Use the directory containing buf.yaml
+	bufDir := filepath.Dir(bufYamlPath)
 
 	// Use buf to build the image
 	cmd := exec.Command("buf", "build", "-o", descriptorFile)
@@ -96,82 +77,6 @@ func (d *Decoder) loadWithBuf(protoDir string) error {
 	return d.loadDescriptorSet(data)
 }
 
-func (d *Decoder) loadWithProtoc(protoDir string) error {
-	tempDir := filepath.Join(os.TempDir(), "buf-kcat-descriptors")
-	os.MkdirAll(tempDir, 0755)
-	defer os.RemoveAll(tempDir)
-
-	// Find all proto files
-	var protoFiles []string
-	err := filepath.Walk(protoDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() && strings.HasSuffix(path, ".proto") {
-			protoFiles = append(protoFiles, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	if len(protoFiles) == 0 {
-		return fmt.Errorf("no .proto files found in %s", protoDir)
-	}
-
-	// Compile with protoc
-	descriptorFile := filepath.Join(tempDir, "descriptor.pb")
-	args := []string{
-		"--descriptor_set_out=" + descriptorFile,
-		"--include_imports",
-		"--include_source_info",
-		"--proto_path=" + protoDir,
-	}
-	
-	// Add parent directories as proto paths
-	if parent := filepath.Dir(protoDir); parent != "." && parent != "/" {
-		args = append(args, "--proto_path="+parent)
-	}
-	
-	args = append(args, protoFiles...)
-	
-	cmd := exec.Command("protoc", args...)
-	var stderr bytes.Buffer
-	cmd.Stderr = &stderr
-	
-	if err := cmd.Run(); err != nil {
-		// Try individual files if batch fails
-		var lastErr error
-		for _, protoFile := range protoFiles {
-			singleArgs := []string{
-				"--descriptor_set_out=" + descriptorFile,
-				"--include_imports",
-				"--proto_path=" + protoDir,
-				protoFile,
-			}
-			if err := exec.Command("protoc", singleArgs...).Run(); err == nil {
-				if data, err := os.ReadFile(descriptorFile); err == nil {
-					d.loadDescriptorSet(data)
-				}
-			} else {
-				lastErr = err
-			}
-		}
-		if len(d.messageTypes) == 0 && lastErr != nil {
-			return fmt.Errorf("protoc failed: %v", lastErr)
-		}
-	} else {
-		// Load the compiled descriptor
-		data, err := os.ReadFile(descriptorFile)
-		if err != nil {
-			return fmt.Errorf("failed to read descriptor: %w", err)
-		}
-		return d.loadDescriptorSet(data)
-	}
-
-	return nil
-}
 
 func (d *Decoder) loadDescriptorSet(data []byte) error {
 	var fdSet descriptorpb.FileDescriptorSet

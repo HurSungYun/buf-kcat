@@ -5,9 +5,15 @@ A Kafka consumer CLI tool with protobuf decoding using buf. Combines the functio
 ## Features
 
 - 🚀 **Protobuf decoding** - Decodes Kafka messages using protobuf definitions
-- 📦 **buf.yaml support** - Automatically uses buf for proto compilation if available
+- 📦 **buf.yaml based** - Uses buf for proto compilation with full dependency support
 - 🎨 **Multiple output formats** - JSON, table, pretty, raw formats
 - 🔧 **Familiar kafkacat interface** - Similar command-line options
+
+## Requirements
+
+- Go 1.21+
+- `buf` CLI - for proto compilation
+- A `buf.yaml` configuration file in your project
 
 ## Installation
 
@@ -37,29 +43,29 @@ go build -o buf-kcat
 ### Basic Usage
 
 ```bash
-# Consume from topic (directory with buf.yaml, message type required)
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage
+# Consume from topic with buf.yaml
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
 
 # Consume last 10 messages
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage -c 10 -o end
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage -c 10 -o end
 
 # Follow topic (like tail -f)
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage --follow
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage --follow
 
 # List available message types
-buf-kcat list -p /path/to/buf-project
+buf-kcat list -p /path/to/buf.yaml
 ```
 
-### With buf.yaml
+### Using buf.yaml
 
-If your project uses `buf.yaml`:
+buf-kcat requires a `buf.yaml` configuration file for proto compilation:
 
 ```bash
-# Point to directory containing buf.yaml or its subdirectories
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf-project -m mypackage.MyMessage
-
-# buf-kcat will automatically detect and use buf.yaml for proto compilation
+# Pass your buf.yaml file path
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
 ```
+
+This ensures proper dependency resolution and consistent proto compilation using buf's build system.
 
 ### Command-line Options
 
@@ -69,7 +75,7 @@ Flags:
   -t, --topic string          Kafka topic (required)
   -m, --message-type string   Protobuf message type (required)
   -g, --group string          Consumer group (default "buf-kcat")
-  -p, --proto string          Directory containing buf.yaml or proto files (default ".")
+  -p, --proto string          Path to buf.yaml file (default "buf.yaml")
   -f, --format string         Output format: json, json-compact, table, raw, pretty (default "pretty")
   -o, --offset string         Start offset: beginning, end, stored (default "end")
   -c, --count int            Number of messages to consume (0 = unlimited)
@@ -130,20 +136,20 @@ Value:
 
 ### Debugging a specific message
 ```bash
-# Get the last message from a topic (./protos should contain buf.yaml)
-buf-kcat -b broker:9092 -t events -p ./protos -m mypackage.EventMessage -c 1 -o end -f json | jq .
+# Get the last message from a topic
+buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage -c 1 -o end -f json | jq .
 ```
 
 ### Following a topic with filtering
 ```bash
 # Follow topic and show only messages with specific key
-buf-kcat -b broker:9092 -t events -p ./buf-project -m mypackage.EventMessage --follow -k "user-123"
+buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage --follow -k "user-123"
 ```
 
 ### Export messages for analysis
 ```bash
-# Export last 1000 messages to file (directory with buf.yaml)
-buf-kcat -b broker:9092 -t events -p ./buf-project -m mypackage.EventMessage -c 1000 -f json > messages.jsonl
+# Export last 1000 messages to file
+buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage -c 1000 -f json > messages.jsonl
 ```
 
 ## How It Works
@@ -151,7 +157,6 @@ buf-kcat -b broker:9092 -t events -p ./buf-project -m mypackage.EventMessage -c 
 1. **Proto Loading**: 
    - Checks for `buf.yaml` in the specified directory or parent directories
    - If found, uses `buf build` to compile all protos with dependencies
-   - Otherwise, falls back to `protoc` for compilation
 
 2. **Message Decoding**:
    - Uses the specified message type to decode protobuf messages
@@ -161,24 +166,6 @@ buf-kcat -b broker:9092 -t events -p ./buf-project -m mypackage.EventMessage -c 
    - Decodes protobuf to JSON using protojson
    - Formats according to selected output format
    - Shows errors and raw hex for messages that fail to decode
-
-## Requirements
-
-- Go 1.21+
-- One of:
-  - `buf` CLI (recommended) - for projects with buf.yaml
-  - `protoc` - for standalone proto files
-
-## Comparison with kafkacat/kcat
-
-| Feature | kafkacat/kcat | buf-kcat |
-|---------|--------------|----------|
-| Consume messages | ✅ | ✅ |
-| Produce messages | ✅ | ❌ |
-| Protobuf decoding | ❌ | ✅ |
-| buf.yaml support | ❌ | ✅ |
-| JSON output | ✅ | ✅ |
-| Colored output | ❌ | ✅ |
 
 ## Contributing
 
