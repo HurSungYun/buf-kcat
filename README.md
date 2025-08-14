@@ -2,6 +2,8 @@
 
 A Kafka consumer CLI tool with protobuf decoding using buf. Combines the functionality of [kafkacat/kcat](https://github.com/edenhill/kcat) with protobuf message decoding for better debugging and monitoring.
 
+> ⚠️ **Note**: This is a debugging/development tool that requires the `buf` CLI to be installed. It uses `buf build` command internally to compile protobuf definitions, which involves executing external commands. Not recommended for production use cases where security and reliability are critical.
+
 ## Features
 
 - 🚀 **Protobuf decoding** - Decodes Kafka messages using protobuf definitions
@@ -12,8 +14,7 @@ A Kafka consumer CLI tool with protobuf decoding using buf. Combines the functio
 ## Requirements
 
 - Go 1.21+
-- `buf` CLI - for proto compilation
-- A `buf.yaml` configuration file in your project
+- `buf` CLI - **Required**: This tool executes `buf build` command internally for proto compilation. [Install buf](https://docs.buf.build/installation)
 
 ## Installation
 
@@ -146,8 +147,9 @@ buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage -c 100
 ## How It Works
 
 1. **Proto Loading**: 
-   - Checks for `buf.yaml` in the specified directory or parent directories
-   - If found, uses `buf build` to compile all protos with dependencies
+   - Validates the provided `buf.yaml` file exists
+   - Executes `buf build` command to compile all protos with dependencies
+   - **Security Note**: This involves spawning an external process (`buf` CLI)
 
 2. **Message Decoding**:
    - Uses the specified message type to decode protobuf messages
