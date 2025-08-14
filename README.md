@@ -2,7 +2,7 @@
 
 A Kafka consumer CLI tool with protobuf decoding using buf. Combines the functionality of [kafkacat/kcat](https://github.com/edenhill/kcat) with protobuf message decoding for better debugging and monitoring.
 
-> ⚠️ **Note**: This is a debugging/development tool that requires the `buf` CLI to be installed. It uses `buf build` command internally to compile protobuf definitions, which involves executing external commands. Not recommended for production use cases where security and reliability are critical.
+> ⚠️ **Note**: This is a debugging/development tool that requires the `buf` CLI to be installed. Currently, it uses `buf build` command internally to compile protobuf definitions, which involves executing external commands. Not recommended for production use cases where security and reliability are critical.
 
 ## Features
 
