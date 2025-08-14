@@ -36,14 +36,7 @@ func NewDecoder(bufYamlPath string, messageType string) (*Decoder, error) {
 	return d, nil
 }
 
-
-
 func (d *Decoder) loadWithBuf(bufYamlPath string) error {
-	// Validate that the file exists and is buf.yaml
-	if filepath.Base(bufYamlPath) != "buf.yaml" {
-		return fmt.Errorf("expected buf.yaml file, got: %s", bufYamlPath)
-	}
-	
 	if _, err := os.Stat(bufYamlPath); err != nil {
 		return fmt.Errorf("buf.yaml not found: %w", err)
 	}
@@ -60,10 +53,10 @@ func (d *Decoder) loadWithBuf(bufYamlPath string) error {
 	// Use buf to build the image
 	cmd := exec.Command("buf", "build", "-o", descriptorFile)
 	cmd.Dir = bufDir
-	
+
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	
+
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("buf build failed: %v - %s", err, stderr.String())
 	}
@@ -76,7 +69,6 @@ func (d *Decoder) loadWithBuf(bufYamlPath string) error {
 
 	return d.loadDescriptorSet(data)
 }
-
 
 func (d *Decoder) loadDescriptorSet(data []byte) error {
 	var fdSet descriptorpb.FileDescriptorSet
@@ -98,12 +90,12 @@ func (d *Decoder) loadDescriptorSet(data []byte) error {
 				continue
 			}
 		}
-		
+
 		// Register the file
 		if _, err := d.registry.FindFileByPath(fd.Path()); err != nil {
 			d.registry.RegisterFile(fd)
 		}
-		
+
 		// Load all messages
 		d.loadMessages(fd)
 	}
@@ -125,7 +117,7 @@ func (d *Decoder) loadMessages(fd protoreflect.FileDescriptor) {
 func (d *Decoder) loadMessage(msg protoreflect.MessageDescriptor) {
 	fullName := string(msg.FullName())
 	d.messageTypes[fullName] = dynamicpb.NewMessageType(msg)
-	
+
 	// Load nested messages
 	nested := msg.Messages()
 	for i := 0; i < nested.Len(); i++ {
@@ -168,7 +160,6 @@ func (d *Decoder) decodeWithType(data []byte, typeName string) ([]byte, string, 
 
 	return jsonData, typeName, nil
 }
-
 
 func (d *Decoder) MessageTypeCount() int {
 	return len(d.messageTypes)
