@@ -34,6 +34,8 @@ go build -o buf-kcat
 
 ### Basic Usage
 
+buf-kcat requires a `buf.yaml` configuration file for proto compilation:
+
 ```bash
 # Consume from topic with buf.yaml
 buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
@@ -48,16 +50,64 @@ buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessa
 buf-kcat list -p /path/to/buf.yaml
 ```
 
-### Using buf.yaml
+### Example Output
 
-buf-kcat requires a `buf.yaml` configuration file for proto compilation:
+When you run buf-kcat, you'll see connection status messages followed by the decoded messages:
 
 ```bash
-# Pass your buf.yaml file path
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
+$ buf-kcat -b localhost:9092 -t events -p ./protos/buf.yaml -m events.UserEvent --follow
+
+Connected to Kafka brokers: [localhost:9092]
+Starting to consume from topic 'events' (group: buf-kcat, offset: end)
+Message type: events.UserEvent
+Following topic (press Ctrl+C to stop)...
+Waiting for messages...
+
+[15:04:05] events/0@12345 key=user-123 type=events.UserEvent
+{
+  "user_id": "123",
+  "event_type": "LOGIN",
+  "timestamp": "2024-01-15T15:04:05Z",
+  "metadata": {
+    "ip_address": "192.168.1.1",
+    "user_agent": "Mozilla/5.0"
+  }
+}
+
+[15:04:12] events/0@12346 key=user-456 type=events.UserEvent
+{
+  "user_id": "456",
+  "event_type": "LOGOUT",
+  "timestamp": "2024-01-15T15:04:12Z"
+}
 ```
 
-This ensures proper dependency resolution and consistent proto compilation using buf's build system.
+#### List Command Output
+
+The list command shows all available message types:
+
+```bash
+$ buf-kcat list -p ./protos/buf.yaml
+
+Loaded 15 message types from ./protos/buf.yaml:
+
+events.UserEvent
+events.SystemEvent
+events.OrderEvent
+user.Profile
+user.Settings
+orders.Order
+orders.OrderItem
+orders.ShippingInfo
+common.Timestamp
+common.Money
+common.Address
+metrics.Counter
+metrics.Gauge
+metrics.Histogram
+metrics.Summary
+```
+
 
 ### Command-line Options
 
@@ -80,7 +130,7 @@ Flags:
 ## Output Formats
 
 ### Pretty (default)
-Colored, compact output ideal for development:
+Colored, compact output ideal for development. The header shows timestamp, topic/partition@offset, key, and message type:
 ```
 [15:04:05] my-topic/0@12345 key=user-123 type=UserEvent
 {
@@ -132,16 +182,65 @@ Value:
 buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage -c 1 -o end -f json | jq .
 ```
 
+Example JSON output (formatted with jq):
+```json
+{
+  "topic": "events",
+  "partition": 0,
+  "offset": 12345,
+  "timestamp": "2024-01-15T15:04:05Z",
+  "key": "user-123",
+  "message_type": "mypackage.EventMessage",
+  "value": {
+    "event_id": "evt_abc123",
+    "user_id": "123",
+    "action": "purchase_completed",
+    "amount": 99.99
+  }
+}
+```
+
 ### Following a topic with filtering
 ```bash
 # Follow topic and show only messages with specific key
 buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage --follow -k "user-123"
 ```
 
+This will show connection info and then only messages matching the key filter:
+```
+Connected to Kafka brokers: [broker:9092]
+Starting to consume from topic 'events' (group: buf-kcat, offset: end)
+Message type: mypackage.EventMessage
+Filtering by key: user-123
+Following topic (press Ctrl+C to stop)...
+Waiting for messages...
+
+[15:05:01] events/0@12350 key=user-123 type=mypackage.EventMessage
+{
+  "event_id": "evt_xyz789",
+  "user_id": "123",
+  "action": "profile_updated"
+}
+```
+
 ### Export messages for analysis
 ```bash
 # Export last 1000 messages to file
-buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage -c 1000 -f json > messages.jsonl
+buf-kcat -b broker:9092 -t events -p ./buf.yaml -m mypackage.EventMessage -c 1000 -f json-compact > messages.jsonl
+```
+
+The status messages go to stderr, so stdout contains only clean JSON:
+```bash
+# Terminal shows status (stderr):
+Connected to Kafka brokers: [broker:9092]
+Starting to consume from topic 'events' (group: buf-kcat, offset: end)
+Message type: mypackage.EventMessage
+Will consume 1000 messages
+Waiting for messages...
+
+# messages.jsonl contains clean JSON Lines (stdout):
+{"topic":"events","partition":0,"offset":12345,"key":"user-1","timestamp":"2024-01-15T15:00:00Z","message_type":"mypackage.EventMessage","value":{"event_id":"evt_1","user_id":"1"}}
+{"topic":"events","partition":0,"offset":12346,"key":"user-2","timestamp":"2024-01-15T15:00:01Z","message_type":"mypackage.EventMessage","value":{"event_id":"evt_2","user_id":"2"}}
 ```
 
 ## How It Works
