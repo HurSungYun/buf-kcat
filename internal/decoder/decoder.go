@@ -172,3 +172,8 @@ func (d *Decoder) MessageTypes() []string {
 	}
 	return types
 }
+
+// GetMessageTypes returns the map of message types for encoding
+func (d *Decoder) GetMessageTypes() map[string]protoreflect.MessageType {
+	return d.messageTypes
+}
