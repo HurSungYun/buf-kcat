@@ -1,0 +1,125 @@
+# .goreleaser.yaml
+version: 2
+
+project_name: buf-kcat
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+    ignore:
+      - goos: windows
+        goarch: arm64
+      - goos: windows
+        goarch: arm
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    binary: buf-kcat
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'Merge pull request'
+      - 'Merge branch'
+  groups:
+    - title: 'Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Other changes'
+      order: 999
+
+release:
+  github:
+    owner: HurSungYun
+    name: buf-kcat
+  name_template: "v{{.Version}}"
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## buf-kcat v{{.Version}}
+    
+    A Kafka consumer CLI tool with protobuf decoding using buf.
+  footer: |
+    ## Installation
+    
+    ### Using Go
+    ```bash
+    go install github.com/HurSungYun/buf-kcat@v{{.Version}}
+    ```
+    
+    ### Using Homebrew (macOS/Linux)
+    ```bash
+    brew tap HurSungYun/tap
+    brew install buf-kcat
+    ```
+    
+    ### Download binaries
+    See the Assets section below for pre-built binaries for your platform.
+
+brews:
+  - repository:
+      owner: HurSungYun
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    folder: Formula
+    homepage: "https://github.com/HurSungYun/buf-kcat"
+    description: "Kafka consumer CLI tool with protobuf decoding using buf"
+    license: "MIT"
+    test: |
+      system "#{bin}/buf-kcat", "--help"
+    dependencies:
+      - name: protobuf
+        type: optional
+      - name: buf
+        type: optional
