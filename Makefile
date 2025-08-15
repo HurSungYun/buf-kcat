@@ -1,4 +1,4 @@
-.PHONY: help build test clean install release-dry release-snapshot
+.PHONY: help build test clean install release-dry release-snapshot integration-test docker-up docker-down test-all lint
 
 # Variables
 BINARY_NAME=buf-kcat
@@ -14,7 +14,7 @@ help: ## Show this help message
 build: ## Build the binary
 	go build ${LDFLAGS} -o ${BINARY_NAME} .
 
-test: ## Run tests
+test: ## Run unit tests
 	go test -v -race ./...
 
 clean: ## Clean build artifacts
@@ -46,3 +46,24 @@ tag: ## Create a new tag (use VERSION=v1.0.0 make tag)
 	fi
 	git tag -a ${VERSION} -m "Release ${VERSION}"
 	@echo "Tag ${VERSION} created. Run 'git push origin ${VERSION}' to trigger release"
+
+integration-test: build ## Run integration tests
+	cd test/integration && go test -v -timeout 5m
+
+docker-up: ## Start docker compose for testing
+	docker-compose -f docker-compose.test.yml up -d
+	@echo "Waiting for Kafka to be ready..."
+	@sleep 10
+
+docker-down: ## Stop docker compose
+	docker-compose -f docker-compose.test.yml down -v
+
+test-all: test integration-test ## Run all tests (unit + integration)
+
+lint: ## Lint the code
+	@if command -v golangci-lint > /dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		go vet ./...; \
+		go fmt ./...; \
+	fi

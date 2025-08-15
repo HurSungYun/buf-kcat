@@ -60,3 +60,8 @@ coverage.html
 
 # Binary dist folder
 dist/
+
+# Test artifacts
+test-messages-*.json
+*.jsonl
+coverage.out
