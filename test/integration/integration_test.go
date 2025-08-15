@@ -344,7 +344,7 @@ func TestConsumeCommand(t *testing.T) {
 			if tt.checkJSON {
 				// Parse JSON output - could be indented or compact
 				foundMessage := false
-				
+
 				// First, try to find JSON objects in the output (handles both compact and indented)
 				// Look for complete JSON objects by finding matching braces
 				jsonStart := strings.Index(outputStr, "{")
@@ -354,25 +354,25 @@ func TestConsumeCommand(t *testing.T) {
 					inString := false
 					escapeNext := false
 					jsonEnd := -1
-					
+
 					for i := jsonStart; i < len(outputStr); i++ {
 						ch := outputStr[i]
-						
+
 						if escapeNext {
 							escapeNext = false
 							continue
 						}
-						
+
 						if ch == '\\' {
 							escapeNext = true
 							continue
 						}
-						
+
 						if ch == '"' && !escapeNext {
 							inString = !inString
 							continue
 						}
-						
+
 						if !inString {
 							if ch == '{' {
 								openBraces++
@@ -385,7 +385,7 @@ func TestConsumeCommand(t *testing.T) {
 							}
 						}
 					}
-					
+
 					if jsonEnd > jsonStart {
 						jsonStr := outputStr[jsonStart:jsonEnd]
 						var result map[string]interface{}
@@ -432,7 +432,7 @@ func TestOutputFormats(t *testing.T) {
 	// Produce a fresh message for testing formats
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	testMessage := fmt.Sprintf(`{"user_id": "format-test-%d", "event_type": "FORMAT_TEST"}`, time.Now().Unix())
 	cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
 		"-b", kafkaBroker,
@@ -443,7 +443,7 @@ func TestOutputFormats(t *testing.T) {
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("Failed to produce test message: %v\nOutput: %s", err, output)
 	}
-	
+
 	time.Sleep(2 * time.Second) // Give Kafka time to process
 
 	tests := []struct {
@@ -465,7 +465,7 @@ func TestOutputFormats(t *testing.T) {
 			checkFunc: func(t *testing.T, output string) {
 				// Should have valid JSON output (could be indented or compact)
 				foundJSON := false
-				
+
 				// Try to find JSON object in the output
 				jsonStart := strings.Index(output, "{")
 				if jsonStart >= 0 {
@@ -474,25 +474,25 @@ func TestOutputFormats(t *testing.T) {
 					inString := false
 					escapeNext := false
 					jsonEnd := -1
-					
+
 					for i := jsonStart; i < len(output); i++ {
 						ch := output[i]
-						
+
 						if escapeNext {
 							escapeNext = false
 							continue
 						}
-						
+
 						if ch == '\\' {
 							escapeNext = true
 							continue
 						}
-						
+
 						if ch == '"' && !escapeNext {
 							inString = !inString
 							continue
 						}
-						
+
 						if !inString {
 							if ch == '{' {
 								openBraces++
@@ -505,7 +505,7 @@ func TestOutputFormats(t *testing.T) {
 							}
 						}
 					}
-					
+
 					if jsonEnd > jsonStart {
 						jsonStr := output[jsonStart:jsonEnd]
 						var result map[string]interface{}
@@ -517,7 +517,7 @@ func TestOutputFormats(t *testing.T) {
 						}
 					}
 				}
-				
+
 				if !foundJSON {
 					t.Error("No valid JSON message found in output")
 				}
