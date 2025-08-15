@@ -1,12 +1,13 @@
 # buf-kcat
 
-A Kafka consumer CLI tool with protobuf decoding using buf. Combines the functionality of [kafkacat/kcat](https://github.com/edenhill/kcat) with protobuf message decoding for better debugging and monitoring.
+A Kafka client CLI tool with protobuf encoding/decoding using buf. Combines the functionality of [kafkacat/kcat](https://github.com/edenhill/kcat) with protobuf message encoding and decoding for better debugging and monitoring.
 
 > ⚠️ **Note**: This is a debugging/development tool that requires the `buf` CLI to be installed. Currently, it uses `buf build` command internally to compile protobuf definitions, which involves executing external commands. Not recommended for production use cases where security and reliability are critical.
 
 ## Features
 
-- 🚀 **Protobuf decoding** - Decodes Kafka messages using protobuf definitions
+- 🚀 **Protobuf encoding/decoding** - Encodes and decodes Kafka messages using protobuf definitions
+- ✍️ **Producer mode** - Send JSON messages that are automatically encoded to protobuf
 - 📦 **buf.yaml based** - Uses buf for proto compilation with full dependency support
 - 🎨 **Multiple output formats** - JSON, table, pretty, raw formats
 - 🔧 **Familiar kafkacat interface** - Similar command-line options
@@ -48,6 +49,68 @@ buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessa
 
 # List available message types
 buf-kcat list -p /path/to/buf.yaml
+```
+
+### Producer Mode
+
+Produce JSON messages that are automatically encoded to protobuf:
+
+```bash
+# Produce a single message from stdin
+echo '{"user_id": "123", "event_type": "LOGIN"}' | \
+  buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent
+
+# Produce multiple messages from a file
+buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent -F messages.json
+
+# Produce with a specific key
+echo '{"order_id": "456", "total": 99.99}' | \
+  buf-kcat produce -b localhost:9092 -t orders -p buf.yaml -m orders.Order -k "order-456"
+
+# Interactive mode - type JSON messages, press Enter to send each
+buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent
+{"user_id": "789", "event_type": "SIGNUP"}
+{"user_id": "790", "event_type": "LOGIN"}
+^D  # Press Ctrl+D to exit
+
+# Produce to specific partition
+echo '{"metric": "cpu", "value": 85.5}' | \
+  buf-kcat produce -b localhost:9092 -t metrics -p buf.yaml -m metrics.Metric -P 2
+```
+
+#### Producer Input Format
+
+The producer accepts JSON input that matches your protobuf message structure:
+
+```json
+// For a protobuf message:
+// message UserEvent {
+//   string user_id = 1;
+//   string event_type = 2;
+//   google.protobuf.Timestamp timestamp = 3;
+// }
+
+// Provide JSON:
+{
+  "user_id": "123",
+  "event_type": "LOGIN",
+  "timestamp": "2024-01-15T15:04:05Z"
+}
+```
+
+#### Producer Output Example
+
+```bash
+$ echo '{"user_id": "123", "event_type": "LOGIN"}' | buf-kcat produce -t events -p buf.yaml -m events.UserEvent
+
+Connected to Kafka brokers: [localhost:9092]
+Producing to topic 'events'
+Message type: events.UserEvent
+Reading messages from stdin (type JSON, press Enter to send, Ctrl+D to exit)...
+
+Produced message 1 to events/0@12345
+
+Produced 1 messages successfully
 ```
 
 ### Example Output
