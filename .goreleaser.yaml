@@ -112,7 +112,7 @@ brews:
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/HurSungYun/buf-kcat"
     description: "Kafka consumer CLI tool with protobuf decoding using buf"
     license: "MIT"
