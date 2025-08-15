@@ -42,7 +42,7 @@ make docker-down
 go build -o buf-kcat .
 
 # Start Kafka
-docker-compose -f docker-compose.test.yml up -d
+docker compose -f docker-compose.test.yml up -d
 
 # Wait for Kafka to be ready (check with docker ps)
 sleep 20
@@ -53,7 +53,7 @@ go test -v -timeout 5m
 
 # Clean up
 cd ../..
-docker-compose -f docker-compose.test.yml down -v
+docker compose -f docker-compose.test.yml down -v
 ```
 
 ## Test Coverage
@@ -84,7 +84,7 @@ The CI workflow:
 
 ### Kafka not starting
 - Check Docker is running: `docker ps`
-- Check logs: `docker-compose -f docker-compose.test.yml logs`
+- Check logs: `docker compose -f docker-compose.test.yml logs`
 - Ensure port 9092 is not in use: `lsof -i :9092`
 
 ### Tests timing out

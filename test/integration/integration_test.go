@@ -16,10 +16,10 @@ import (
 )
 
 const (
-	testTopic    = "test-events"
-	kafkaBroker  = "localhost:9092"
-	testTimeout  = 30 * time.Second
-	bufKcatBin   = "../../buf-kcat"
+	testTopic   = "test-events"
+	kafkaBroker = "localhost:9092"
+	testTimeout = 30 * time.Second
+	bufKcatBin  = "../../buf-kcat"
 )
 
 func TestMain(m *testing.M) {
@@ -34,7 +34,7 @@ func TestMain(m *testing.M) {
 
 	// Start docker compose
 	fmt.Println("Starting Kafka with docker-compose...")
-	cmd = exec.Command("docker-compose", "-f", "../../docker-compose.test.yml", "up", "-d")
+	cmd = exec.Command("docker", "compose", "-f", "../../docker-compose.test.yml", "up", "-d")
 	if err := cmd.Run(); err != nil {
 		fmt.Printf("Failed to start docker-compose: %v\n", err)
 		os.Exit(1)
@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 }
 
 func stopDocker() {
-	cmd := exec.Command("docker-compose", "-f", "../../docker-compose.test.yml", "down", "-v")
+	cmd := exec.Command("docker", "compose", "-f", "../../docker-compose.test.yml", "down", "-v")
 	_ = cmd.Run()
 }
 
@@ -97,7 +97,7 @@ func createTopic(topic string) error {
 		"--topic", topic,
 		"--partitions", "3",
 		"--replication-factor", "1")
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		// Check if error is because topic already exists
@@ -112,7 +112,7 @@ func createTopic(topic string) error {
 func TestListCommand(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, bufKcatBin, "list", "-p", "../example/buf.yaml")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -147,7 +147,7 @@ func TestProduceAndConsume(t *testing.T) {
 	t.Run("Produce", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
 			"-b", kafkaBroker,
 			"-t", testTopic,
@@ -173,7 +173,7 @@ func TestProduceAndConsume(t *testing.T) {
 	t.Run("Consume", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		
+
 		cmd := exec.CommandContext(ctx, bufKcatBin,
 			"-b", kafkaBroker,
 			"-t", testTopic,
@@ -190,19 +190,19 @@ func TestProduceAndConsume(t *testing.T) {
 
 		// Parse the JSON output - look for the JSON object in the output
 		outputStr := string(output)
-		
+
 		// Find the JSON object in the output (may have status messages before it)
 		startIdx := strings.Index(outputStr, "{")
 		if startIdx == -1 {
 			t.Fatalf("No JSON output found: %s", outputStr)
 		}
-		
+
 		jsonStr := outputStr[startIdx:]
 		endIdx := strings.LastIndex(jsonStr, "}")
 		if endIdx != -1 {
 			jsonStr = jsonStr[:endIdx+1]
 		}
-		
+
 		var result map[string]interface{}
 		if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
 			t.Fatalf("Failed to parse JSON output: %v\nJSON: %s", err, jsonStr)
@@ -212,7 +212,7 @@ func TestProduceAndConsume(t *testing.T) {
 		if result["key"] != "test-key" {
 			t.Errorf("Expected key 'test-key', got %v", result["key"])
 		}
-		
+
 		value, ok := result["value"].(map[string]interface{})
 		if !ok {
 			t.Errorf("Value is not a map: %v", result["value"])
@@ -257,7 +257,7 @@ func TestProduceMultipleMessages(t *testing.T) {
 	// Produce from file
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
 		"-b", kafkaBroker,
 		"-t", testTopic,
@@ -287,7 +287,7 @@ func TestConsumeWithDifferentFormats(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
 		"-b", kafkaBroker,
 		"-t", testTopic,
@@ -305,7 +305,7 @@ func TestConsumeWithDifferentFormats(t *testing.T) {
 		t.Run(fmt.Sprintf("Format_%s", format), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			
+
 			cmd := exec.CommandContext(ctx, bufKcatBin,
 				"-b", kafkaBroker,
 				"-t", testTopic,
@@ -352,7 +352,7 @@ func TestErrorHandling(t *testing.T) {
 	t.Run("InvalidMessageType", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		cmd := exec.CommandContext(ctx, bufKcatBin,
 			"-b", kafkaBroker,
 			"-t", testTopic,
@@ -369,7 +369,7 @@ func TestErrorHandling(t *testing.T) {
 	t.Run("InvalidBufFile", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		cmd := exec.CommandContext(ctx, bufKcatBin,
 			"-b", kafkaBroker,
 			"-t", testTopic,
@@ -386,7 +386,7 @@ func TestErrorHandling(t *testing.T) {
 	t.Run("InvalidJSON", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
 			"-b", kafkaBroker,
 			"-t", testTopic,

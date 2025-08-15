@@ -90,7 +90,7 @@ func (f *TableFormatter) Format(msg Message) error {
 	fmt.Printf("Offset:      %d\n", msg.Offset)
 	fmt.Printf("Timestamp:   %s\n", msg.Timestamp.Format(time.RFC3339))
 	fmt.Printf("Key:         %s\n", msg.Key)
-	
+
 	if msg.MessageType != "" {
 		fmt.Printf("Type:        %s\n", msg.MessageType)
 	}
@@ -106,7 +106,7 @@ func (f *TableFormatter) Format(msg Message) error {
 			fmt.Printf("%v\n", msg.Value)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -128,23 +128,23 @@ type PrettyFormatter struct{}
 
 func (f *PrettyFormatter) Format(msg Message) error {
 	// Compact header
-	header := fmt.Sprintf("[%s] %s/%d@%d", 
+	header := fmt.Sprintf("[%s] %s/%d@%d",
 		msg.Timestamp.Format("15:04:05"),
 		msg.Topic,
 		msg.Partition,
 		msg.Offset,
 	)
-	
+
 	if msg.Key != "" {
 		header += fmt.Sprintf(" key=%s", msg.Key)
 	}
-	
+
 	if msg.MessageType != "" {
 		header += fmt.Sprintf(" type=%s", shortTypeName(msg.MessageType))
 	}
-	
+
 	fmt.Printf("%s%s%s\n", "\033[36m", header, "\033[0m") // Cyan header
-	
+
 	if msg.Error != "" {
 		fmt.Printf("\033[31mError: %s\033[0m\n", msg.Error) // Red error
 		if len(msg.RawValue) > 0 {
@@ -157,7 +157,7 @@ func (f *PrettyFormatter) Format(msg Message) error {
 			fmt.Printf("%v\n", msg.Value)
 		}
 	}
-	
+
 	return nil
 }
 

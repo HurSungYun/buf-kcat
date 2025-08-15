@@ -5,7 +5,7 @@ echo "Building buf-kcat binary..."
 go build -o buf-kcat .
 
 echo "Starting Kafka with docker-compose..."
-docker-compose -f docker-compose.test.yml up -d
+docker compose -f docker-compose.test.yml up -d
 
 echo "Waiting for Kafka to be ready..."
 max_attempts=30
@@ -31,6 +31,6 @@ test_result=$?
 
 echo "Cleaning up..."
 cd ../..
-docker-compose -f docker-compose.test.yml down -v
+docker compose -f docker-compose.test.yml down -v
 
 exit $test_result

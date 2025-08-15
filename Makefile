@@ -51,12 +51,12 @@ integration-test: build ## Run integration tests
 	cd test/integration && go test -v -timeout 5m
 
 docker-up: ## Start docker compose for testing
-	docker-compose -f docker-compose.test.yml up -d
+	docker compose -f docker-compose.test.yml up -d
 	@echo "Waiting for Kafka to be ready..."
 	@sleep 10
 
 docker-down: ## Stop docker compose
-	docker-compose -f docker-compose.test.yml down -v
+	docker compose -f docker-compose.test.yml down -v
 
 test-all: test integration-test ## Run all tests (unit + integration)
 

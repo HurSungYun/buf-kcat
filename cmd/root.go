@@ -52,7 +52,7 @@ func init() {
 	// Persistent flags (available to all commands)
 	rootCmd.PersistentFlags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
-	
+
 	// Flags specific to consume command
 	rootCmd.Flags().StringSliceVarP(&brokers, "brokers", "b", []string{"localhost:9092"}, "Kafka brokers (comma-separated)")
 	rootCmd.Flags().StringVarP(&topic, "topic", "t", "", "Kafka topic (required)")
