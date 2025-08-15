@@ -59,7 +59,7 @@ func init() {
 
 	produceCmd.MarkFlagRequired("topic")
 	produceCmd.MarkFlagRequired("message-type")
-	
+
 	rootCmd.AddCommand(produceCmd)
 }
 
@@ -133,7 +133,7 @@ func runProduce(cmd *cobra.Command, args []string) {
 
 		// Parse JSON input
 		jsonData := []byte(line)
-		
+
 		// Validate JSON
 		var jsonObj interface{}
 		if err := json.Unmarshal(jsonData, &jsonObj); err != nil {
@@ -168,9 +168,9 @@ func runProduce(cmd *cobra.Command, args []string) {
 
 		messageCount++
 		r, _ := result.First()
-		fmt.Fprintf(os.Stderr, "Produced message %d to %s/%d@%d\n", 
+		fmt.Fprintf(os.Stderr, "Produced message %d to %s/%d@%d\n",
 			messageCount, r.Topic, r.Partition, r.Offset)
-		
+
 		if verbose {
 			fmt.Fprintf(os.Stderr, "  JSON: %s\n", line)
 		}
@@ -201,7 +201,7 @@ func encodeMessage(dec *decoder.Decoder, msgTypeName string, jsonData []byte) ([
 		DiscardUnknown: false,
 		AllowPartial:   false,
 	}
-	
+
 	if err := unmarshaler.Unmarshal(jsonData, msg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JSON to proto: %w", err)
 	}

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package events;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/HurSungYun/buf-kcat/test/example/proto/events";
+
+message UserEvent {
+  string user_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  map<string, string> metadata = 4;
+}
+
+message SystemEvent {
+  string system_id = 1;
+  string event_level = 2;
+  string message = 3;
+  google.protobuf.Timestamp timestamp = 4;
+}
+
+message OrderEvent {
+  string order_id = 1;
+  string user_id = 2;
+  string status = 3;
+  double total_amount = 4;
+  repeated OrderItem items = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message OrderItem {
+  string product_id = 1;
+  int32 quantity = 2;
+  double price = 3;
+}

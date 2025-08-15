@@ -12,7 +12,7 @@ import (
 var listCmd = &cobra.Command{
 	Use:   "list [proto-directory]",
 	Short: "List available message types",
-	Long:  `List all protobuf message types found in the proto directory.
+	Long: `List all protobuf message types found in the proto directory.
 	
 Examples:
   # List using flag
