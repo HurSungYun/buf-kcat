@@ -19,6 +19,12 @@ A Kafka client CLI tool with protobuf encoding/decoding using buf. Combines the 
 
 ## Installation
 
+### Using Homebrew (macOS/Linux)
+```bash
+brew tap HurSungYun/tap
+brew install buf-kcat
+```
+
 ### Using Go
 ```bash
 go install github.com/HurSungYun/buf-kcat@latest
@@ -30,6 +36,9 @@ git clone https://github.com/HurSungYun/buf-kcat
 cd buf-kcat
 go build -o buf-kcat
 ```
+
+### Download Binary
+Download pre-built binaries from the [releases page](https://github.com/HurSungYun/buf-kcat/releases).
 
 ## Usage
 
