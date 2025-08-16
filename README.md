@@ -7,9 +7,10 @@ A Kafka client CLI tool with protobuf encoding/decoding using buf. Combines the 
 ## Features
 
 - 🚀 **Protobuf encoding/decoding** - Encodes and decodes Kafka messages using protobuf definitions
+- 🔗 **Pipe-friendly JSON output** - Default JSON format for easy integration with jq, grep, and other tools
 - ✍️ **Producer mode** - Send JSON messages that are automatically encoded to protobuf
 - 📦 **buf.yaml based** - Uses buf for proto compilation with full dependency support
-- 🎨 **Multiple output formats** - JSON, table, pretty, raw formats
+- 🎨 **Multiple output formats** - JSON (default), json-compact, table, pretty, raw formats
 - 🔧 **Familiar kafkacat interface** - Similar command-line options
 
 ## Requirements
@@ -44,17 +45,20 @@ Download pre-built binaries from the [releases page](https://github.com/HurSungY
 
 ### Basic Usage
 
-buf-kcat requires a `buf.yaml` configuration file for proto compilation:
+buf-kcat requires a `buf.yaml` configuration file for proto compilation. By default, output is in JSON format for easy integration with pipes and other tools:
 
 ```bash
-# Consume from topic with buf.yaml
+# Consume from topic (outputs JSON by default)
 buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
 
-# Consume last 10 messages
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage -c 10 -o end
+# Pipe JSON output to jq for processing
+buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage -c 10 | jq '.value'
 
-# Follow topic (like tail -f)
-buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage --follow
+# Use pretty format for human-readable output
+buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage -f pretty
+
+# Follow topic and filter with jq
+buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage --follow | jq 'select(.value.status == "ERROR")'
 
 # List available message types
 buf-kcat list -p /path/to/buf.yaml
@@ -122,35 +126,72 @@ Produced message 1 to events/0@12345
 Produced 1 messages successfully
 ```
 
-### Example Output
+### Pipe Integration Examples
 
-When you run buf-kcat, you'll see connection status messages followed by the decoded messages:
+buf-kcat outputs JSON by default, making it perfect for use with tools like `jq`, `grep`, and other Unix utilities:
 
 ```bash
-$ buf-kcat -b localhost:9092 -t events -p ./protos/buf.yaml -m events.UserEvent --follow
+# Extract specific fields
+buf-kcat -t events -p buf.yaml -m events.UserEvent -c 100 | jq -r '.value.user_id'
 
-Connected to Kafka brokers: [localhost:9092]
-Starting to consume from topic 'events' (group: buf-kcat, offset: end)
-Message type: events.UserEvent
-Following topic (press Ctrl+C to stop)...
-Waiting for messages...
+# Filter messages by content
+buf-kcat -t events -p buf.yaml -m events.UserEvent --follow | jq 'select(.value.event_type == "ERROR")'
 
-[15:04:05] events/0@12345 key=user-123 type=events.UserEvent
+# Count messages by type
+buf-kcat -t events -p buf.yaml -m events.UserEvent -c 1000 | jq -r '.value.event_type' | sort | uniq -c
+
+# Save to file for analysis
+buf-kcat -t events -p buf.yaml -m events.UserEvent -o beginning > events.jsonl
+
+# Monitor for specific conditions
+buf-kcat -t metrics -p buf.yaml -m metrics.SystemMetric --follow | \
+  jq 'select(.value.cpu_usage > 80) | {time: .timestamp, cpu: .value.cpu_usage}'
+
+# Format as CSV
+buf-kcat -t users -p buf.yaml -m user.Profile -c 100 | \
+  jq -r '[.key, .value.user_id, .value.email] | @csv'
+```
+
+### Output Formats
+
+```bash
+# JSON (default) - Best for piping and processing
+buf-kcat -t events -p buf.yaml -m events.UserEvent
+
+# Pretty - Human-readable with colors
+buf-kcat -t events -p buf.yaml -m events.UserEvent -f pretty
+
+# Table - Structured view
+buf-kcat -t events -p buf.yaml -m events.UserEvent -f table
+
+# Raw - Just the decoded message value
+buf-kcat -t events -p buf.yaml -m events.UserEvent -f raw
+
+# JSON Compact - Single line JSON
+buf-kcat -t events -p buf.yaml -m events.UserEvent -f json-compact
+```
+
+### Example JSON Output
+
+When using the default JSON format, each message is output as a JSON object:
+
+```json
 {
-  "user_id": "123",
-  "event_type": "LOGIN",
+  "topic": "events",
+  "partition": 0,
+  "offset": 12345,
   "timestamp": "2024-01-15T15:04:05Z",
-  "metadata": {
-    "ip_address": "192.168.1.1",
-    "user_agent": "Mozilla/5.0"
+  "key": "user-123",
+  "message_type": "events.UserEvent",
+  "value": {
+    "user_id": "123",
+    "event_type": "LOGIN",
+    "timestamp": "2024-01-15T15:04:05Z",
+    "metadata": {
+      "ip_address": "192.168.1.1",
+      "user_agent": "Mozilla/5.0"
+    }
   }
-}
-
-[15:04:12] events/0@12346 key=user-456 type=events.UserEvent
-{
-  "user_id": "456",
-  "event_type": "LOGOUT",
-  "timestamp": "2024-01-15T15:04:12Z"
 }
 ```
 
@@ -190,7 +231,7 @@ Flags:
   -m, --message-type string   Protobuf message type (required)
   -g, --group string          Consumer group (default "buf-kcat")
   -p, --proto string          Path to buf.yaml file (default "buf.yaml")
-  -f, --format string         Output format: json, json-compact, table, raw, pretty (default "pretty")
+  -f, --format string         Output format: json, json-compact, table, raw, pretty (default "json")
   -o, --offset string         Start offset: beginning, end, stored (default "end")
   -c, --count int            Number of messages to consume (0 = unlimited)
   -k, --key string           Filter by message key
