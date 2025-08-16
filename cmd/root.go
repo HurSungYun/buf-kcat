@@ -37,6 +37,9 @@ Producer mode:
 
 List message types:
   buf-kcat list -p /path/to/buf.yaml`,
+	CompletionOptions: cobra.CompletionOptions{
+		DisableDefaultCmd: true,
+	},
 }
 
 func Execute() {
