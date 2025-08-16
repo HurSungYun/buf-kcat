@@ -95,7 +95,7 @@ echo '{"metric": "cpu", "value": 85.5}' | \
 
 The producer accepts JSON input that matches your protobuf message structure:
 
-```json
+```jsonc
 // For a protobuf message:
 // message UserEvent {
 //   string user_id = 1;
