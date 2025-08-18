@@ -715,6 +715,12 @@ func TestComplexMessageTypes(t *testing.T) {
 			wantFields:  []string{"sys-001", "ERROR", "Database connection failed", "database"},
 		},
 		{
+			name:        "OrderEvent with PaymentMethod enum",
+			messageType: "events.OrderEvent",
+			jsonData:    `{"order_id": "order-789", "user_id": "user-123", "status": "confirmed", "total_amount": 99.99, "payment_method": "CREDIT_CARD", "created_at": "2024-01-15T15:04:05Z", "items": [{"product_id": "prod-1", "quantity": 2, "price": 49.99}]}`,
+			wantFields:  []string{"order-789", "user-123", "confirmed", "99.99", "CREDIT_CARD", "prod-1"},
+		},
+		{
 			name:        "EmptyEvent", 
 			messageType: "events.EmptyEvent",
 			jsonData:    `{}`,
