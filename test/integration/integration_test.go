@@ -1063,6 +1063,21 @@ func TestErrorHandling(t *testing.T) {
 		acceptSuccess bool // Some errors are handled gracefully
 	}{
 		{
+			name:    "consume with invalid message type",
+			command: "consume",
+			args: []string{
+				"-b", kafkaBroker,
+				"-t", testTopic,
+				"-p", "../example/buf.yaml",
+				"-m", "invalid.MessageType",
+				"-c", "1",
+				"-o", "end", // Use end offset to minimize waiting time
+			},
+			wantErr:       false, // CLI doesn't fail immediately - it waits for messages
+			acceptSuccess: true,
+			wantInOutput:  []string{"Message type: invalid.MessageType"}, // Verify it accepts the type
+		},
+		{
 			name:    "invalid buf file",
 			command: "consume",
 			args: []string{
@@ -1099,6 +1114,30 @@ func TestErrorHandling(t *testing.T) {
 				"-c", "1",
 			},
 			wantErr: true,
+		},
+		{
+			name:    "missing required flags - no topic",
+			command: "consume",
+			args: []string{
+				"-b", kafkaBroker,
+				"-p", "../example/buf.yaml",
+				"-m", "events.UserEvent",
+				"-c", "1",
+			},
+			wantErr: true,
+			wantInOutput: []string{"required flag", "topic"},
+		},
+		{
+			name:    "missing required flags - no message type",
+			command: "consume", 
+			args: []string{
+				"-b", kafkaBroker,
+				"-t", testTopic,
+				"-p", "../example/buf.yaml",
+				"-c", "1",
+			},
+			wantErr: true,
+			wantInOutput: []string{"required flag", "message-type"},
 		},
 	}
 
