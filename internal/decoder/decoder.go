@@ -42,7 +42,9 @@ func (d *Decoder) loadWithBuf(bufYamlPath string) error {
 	}
 
 	tempDir := filepath.Join(os.TempDir(), "buf-kcat-descriptors")
-	os.MkdirAll(tempDir, 0755)
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
 	defer os.RemoveAll(tempDir)
 
 	descriptorFile := filepath.Join(tempDir, "image.bin")
@@ -93,7 +95,9 @@ func (d *Decoder) loadDescriptorSet(data []byte) error {
 
 		// Register the file
 		if _, err := d.registry.FindFileByPath(fd.Path()); err != nil {
-			d.registry.RegisterFile(fd)
+			if err := d.registry.RegisterFile(fd); err != nil {
+				return fmt.Errorf("failed to register file %s: %w", fd.Path(), err)
+			}
 		}
 
 		// Load all messages

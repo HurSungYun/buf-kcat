@@ -57,8 +57,8 @@ func init() {
 	produceCmd.Flags().StringVarP(&produceFormat, "format", "f", "json", "Input format: json, json-compact")
 	produceCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
-	produceCmd.MarkFlagRequired("topic")
-	produceCmd.MarkFlagRequired("message-type")
+	_ = produceCmd.MarkFlagRequired("topic")
+	_ = produceCmd.MarkFlagRequired("message-type")
 
 	rootCmd.AddCommand(produceCmd)
 }

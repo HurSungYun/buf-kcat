@@ -149,10 +149,12 @@ func runConsume(cmd *cobra.Command, args []string) {
 						Error:     err.Error(),
 						RawValue:  record.Value,
 					}
-					fmtr.Format(output)
+					if err := fmtr.Format(output); err != nil {
+						fmt.Fprintf(os.Stderr, "Failed to format output: %v\n", err)
+					}
 				} else {
 					// Successfully decoded
-					var value interface{}
+					var value any
 					if err := json.Unmarshal(decoded, &value); err != nil {
 						value = string(decoded)
 					}
@@ -166,7 +168,9 @@ func runConsume(cmd *cobra.Command, args []string) {
 						MessageType: msgType,
 						Value:       value,
 					}
-					fmtr.Format(output)
+					if err := fmtr.Format(output); err != nil {
+						fmt.Fprintf(os.Stderr, "Failed to format output: %v\n", err)
+					}
 				}
 
 				messageCount++

@@ -34,8 +34,8 @@ func init() {
 	consumerCmd.Flags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
 	consumerCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
-	consumerCmd.MarkFlagRequired("topic")
-	consumerCmd.MarkFlagRequired("message-type")
+	_ = consumerCmd.MarkFlagRequired("topic")
+	_ = consumerCmd.MarkFlagRequired("message-type")
 
 	// Also add the same flags to root for backward compatibility
 	rootCmd.Flags().StringSliceVarP(&brokers, "brokers", "b", []string{"localhost:9092"}, "Kafka brokers (comma-separated)")
@@ -49,8 +49,8 @@ func init() {
 	rootCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
 	
 	// Mark required flags for root command as well
-	rootCmd.MarkFlagRequired("topic")
-	rootCmd.MarkFlagRequired("message-type")
+	_ = rootCmd.MarkFlagRequired("topic")
+	_ = rootCmd.MarkFlagRequired("message-type")
 
 	// Set default command behavior
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {
