@@ -66,7 +66,7 @@ func validateJSONMessage(t *testing.T, output string, expectedKey string, expect
 	}
 
 	// Validate expected fields in the value
-	if expectedFields != nil && len(expectedFields) > 0 {
+	if len(expectedFields) > 0 {
 		valueMap, ok := msg.Value.(map[string]any)
 		if !ok {
 			t.Errorf("Value is not a map: %T %v", msg.Value, msg.Value)
@@ -245,18 +245,35 @@ func TestListCommand(t *testing.T) {
 		wantErr      bool
 	}{
 		{
-			name: "list available message types",
+			name: "list available message types from buf.yaml",
 			args: []string{"list", "-p", "../example/buf.yaml"},
 			wantContains: []string{
 				"events.UserEvent",
 				"events.OrderEvent",
 				"events.SystemEvent",
+				"events.ComplexEvent",
+			},
+			wantErr: false,
+		},
+		{
+			name: "list available message types from descriptor set",
+			args: []string{"list", "-p", "../example/schema.desc"},
+			wantContains: []string{
+				"events.UserEvent",
+				"events.OrderEvent",
+				"events.SystemEvent",
+				"events.ComplexEvent",
 			},
 			wantErr: false,
 		},
 		{
 			name:    "list with invalid buf file",
 			args:    []string{"list", "-p", "nonexistent/buf.yaml"},
+			wantErr: true,
+		},
+		{
+			name:    "list with invalid descriptor set",
+			args:    []string{"list", "-p", "nonexistent/schema.desc"},
 			wantErr: true,
 		},
 	}
@@ -742,6 +759,105 @@ func TestProduceMultipleMessages(t *testing.T) {
 			expectedMsg := fmt.Sprintf("Produced %d messages", tt.wantProduced)
 			if !strings.Contains(outputStr, expectedMsg) {
 				t.Errorf("Expected %q in output, got: %s", expectedMsg, outputStr)
+			}
+		})
+	}
+}
+
+func TestDescriptorSetSupport(t *testing.T) {
+	// Create a unique topic for descriptor set tests
+	descTopic := fmt.Sprintf("test-desc-%d", time.Now().UnixNano())
+	if err := createTopic(descTopic); err != nil {
+		t.Fatalf("Failed to create topic: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		messageType    string
+		jsonData       string
+		expectedFields map[string]any
+	}{
+		{
+			name:        "UserEvent via descriptor set",
+			messageType: "events.UserEvent",
+			jsonData:    `{"user_id": "desc-user-1", "event_type": "DESC_TEST"}`,
+			expectedFields: map[string]any{
+				"user_id":    "desc-user-1",
+				"event_type": "DESC_TEST",
+			},
+		},
+		{
+			name:        "ComplexEvent via descriptor set",
+			messageType: "events.ComplexEvent",
+			jsonData:    `{"event_id": "desc-complex-1", "timestamp": "2024-01-15T15:04:05Z", "user_activity": {"user_id": "desc-user-2", "action": "test"}}`,
+			expectedFields: map[string]any{
+				"event_id": "desc-complex-1",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			testKey := fmt.Sprintf("desc-key-%d", time.Now().UnixNano())
+
+			// Test both produce and consume with descriptor set
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			// Produce using descriptor set
+			cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
+				"-b", kafkaBroker,
+				"-t", descTopic,
+				"-p", "../example/schema.desc", // Use descriptor set instead of buf.yaml
+				"-m", tt.messageType,
+				"-k", testKey)
+			cmd.Stdin = strings.NewReader(tt.jsonData)
+
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("Failed to produce message with descriptor set: %v\nOutput: %s", err, output)
+			}
+
+			if !strings.Contains(string(output), "Produced message") {
+				t.Fatalf("Production with descriptor set did not complete: %s", output)
+			}
+
+			time.Sleep(3 * time.Second) // Let Kafka process
+
+			// Consume using descriptor set
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel2()
+
+			cmd2 := exec.CommandContext(ctx2, bufKcatBin,
+				"-b", kafkaBroker,
+				"-t", descTopic,
+				"-p", "../example/schema.desc", // Use descriptor set instead of buf.yaml
+				"-m", tt.messageType,
+				"-k", testKey,
+				"-c", "1",
+				"-o", "beginning",
+				"-f", "json")
+
+			output2, err2 := cmd2.CombinedOutput()
+			if err2 != nil {
+				t.Fatalf("Failed to consume message with descriptor set: %v\nOutput: %s", err2, output2)
+			}
+
+			outputStr := string(output2)
+
+			// Validate the complete JSON message structure
+			msg := validateJSONMessage(t, outputStr, testKey, tt.expectedFields)
+			if msg == nil {
+				return // validateJSONMessage already logged the error
+			}
+
+			// Verify message type and topic
+			if msg.MessageType != tt.messageType {
+				t.Errorf("Expected message_type %q, got %q", tt.messageType, msg.MessageType)
+			}
+
+			if msg.Topic != descTopic {
+				t.Errorf("Expected topic %q, got %q", descTopic, msg.Topic)
 			}
 		})
 	}

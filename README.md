@@ -45,12 +45,15 @@ Download pre-built binaries from the [releases page](https://github.com/HurSungY
 
 ### Basic Usage
 
-buf-kcat requires a `buf.yaml` configuration file for proto compilation, a topic name (`-t`), and a message type (`-m`). By default, output is in JSON format for easy integration with pipes and other tools:
+buf-kcat requires protobuf definitions (either a `buf.yaml` configuration file or a protobuf descriptor set), a topic name (`-t`), and a message type (`-m`). By default, output is in JSON format for easy integration with pipes and other tools:
 
 ```bash
-# Consume from topic (outputs JSON by default)
+# Consume from topic using buf.yaml (outputs JSON by default)
 # Both -t (topic) and -m (message-type) are required
 buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
+
+# Consume using protobuf descriptor set (.desc/.pb/.protoset files)
+buf-kcat -b localhost:9092 -t my-topic -p /path/to/schema.desc -m mypackage.MyMessage
 
 # Pipe JSON output to jq for processing
 buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage -c 10 | jq '.value'
@@ -61,18 +64,49 @@ buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage -f pre
 # Follow topic and filter with jq
 buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage --follow | jq 'select(.value.status == "ERROR")'
 
-# List available message types
+# List available message types from buf.yaml
 buf-kcat list -p /path/to/buf.yaml
+
+# List available message types from descriptor set
+buf-kcat list -p /path/to/schema.desc
 ```
+
+### Protobuf Input Options
+
+buf-kcat supports two ways to provide protobuf definitions:
+
+#### 1. buf.yaml Configuration (Recommended)
+```bash
+# Use buf.yaml for automatic dependency resolution and compilation
+buf-kcat -t my-topic -p buf.yaml -m mypackage.MyMessage
+```
+
+#### 2. Protobuf Descriptor Set Files
+```bash
+# Generate descriptor set from buf.yaml
+buf build -o schema.desc
+
+# Or generate from protoc
+protoc --descriptor_set_out=schema.desc --include_imports *.proto
+
+# Use descriptor set directly (no buf dependency required)
+buf-kcat -t my-topic -p schema.desc -m mypackage.MyMessage
+```
+
+**Supported descriptor set extensions:** `.desc`, `.pb`, `.protoset`, or any binary file containing a protobuf descriptor set.
 
 ### Producer Mode
 
 Produce JSON messages that are automatically encoded to protobuf:
 
 ```bash
-# Produce a single message from stdin
+# Produce a single message from stdin using buf.yaml
 echo '{"user_id": "123", "event_type": "LOGIN"}' | \
   buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent
+
+# Produce using descriptor set
+echo '{"user_id": "123", "event_type": "LOGIN"}' | \
+  buf-kcat produce -b localhost:9092 -t events -p schema.desc -m events.UserEvent
 
 # Produce multiple messages from a file
 buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent -F messages.json
@@ -231,7 +265,7 @@ Flags:
   -t, --topic string          Kafka topic name (REQUIRED)
   -m, --message-type string   Protobuf message type (REQUIRED)
   -g, --group string          Consumer group (default "buf-kcat")
-  -p, --proto string          Path to buf.yaml file (default "buf.yaml")
+  -p, --proto string          Path to buf.yaml file or protobuf descriptor set (.desc/.pb/.protoset) (default "buf.yaml")
   -f, --format string         Output format: json, json-compact, table, raw, pretty (default "json")
   -o, --offset string         Start offset: beginning, end, stored (default "end")
   -c, --count int            Number of messages to consume (0 = unlimited)
@@ -360,9 +394,9 @@ Waiting for messages...
 ## How It Works
 
 1. **Proto Loading**: 
-   - Validates the provided `buf.yaml` file exists
-   - Executes `buf build` command to compile all protos with dependencies
-   - **Security Note**: This involves spawning an external process (`buf` CLI)
+   - **buf.yaml mode**: Validates the provided `buf.yaml` file exists and executes `buf build` command to compile all protos with dependencies (**Security Note**: This involves spawning an external process)
+   - **Descriptor set mode**: Directly loads pre-compiled protobuf descriptor sets (`.desc`, `.pb`, `.protoset` files) - no external dependencies required
+   - Automatically detects input type based on file extension and content
 
 2. **Message Decoding**:
    - Uses the specified message type to decode protobuf messages

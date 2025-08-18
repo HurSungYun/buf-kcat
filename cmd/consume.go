@@ -17,8 +17,11 @@ var consumerCmd = &cobra.Command{
 This is the default command when no subcommand is specified.
 
 Examples:
-  # Consume from topic
+  # Consume from topic using buf.yaml
   buf-kcat consume -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage
+  
+  # Consume using protobuf descriptor set
+  buf-kcat consume -b localhost:9092 -t my-topic -p schema.desc -m mypackage.MyMessage
   
   # Or use without 'consume' (default command)
   buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage`,
@@ -36,7 +39,7 @@ func init() {
 	consumerCmd.Flags().IntVarP(&count, "count", "c", 0, "Number of messages to consume (0 = unlimited)")
 	consumerCmd.Flags().BoolVar(&follow, "follow", false, "Continue consuming messages (like tail -f)")
 	consumerCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
-	consumerCmd.Flags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
+	consumerCmd.Flags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file or protobuf descriptor set (.desc/.pb/.protoset)")
 	consumerCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
 	_ = consumerCmd.MarkFlagRequired("topic")
