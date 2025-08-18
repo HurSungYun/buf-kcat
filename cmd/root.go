@@ -50,7 +50,7 @@ func Execute() {
 
 func init() {
 	// Persistent flags (available to all commands)
-	rootCmd.PersistentFlags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
+	rootCmd.PersistentFlags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file or protobuf descriptor set (.desc/.pb/.protoset)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
 
 	// Add list command

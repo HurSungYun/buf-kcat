@@ -27,8 +27,11 @@ Messages are read from stdin (one per line) or from a file in JSON format.
 The JSON is converted to protobuf using the specified message type.
 
 Examples:
-  # Produce a single message from stdin
+  # Produce a single message from stdin using buf.yaml
   echo '{"user_id": "123", "event_type": "LOGIN"}' | buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent
+
+  # Produce using protobuf descriptor set
+  echo '{"user_id": "123", "event_type": "LOGIN"}' | buf-kcat produce -b localhost:9092 -t events -p schema.desc -m events.UserEvent
 
   # Produce multiple messages from file
   buf-kcat produce -b localhost:9092 -t events -p buf.yaml -m events.UserEvent -F messages.json
@@ -44,7 +47,7 @@ Examples:
 func init() {
 	produceCmd.Flags().StringSliceVarP(&brokers, "brokers", "b", []string{"localhost:9092"}, "Kafka brokers (comma-separated)")
 	produceCmd.Flags().StringVarP(&topic, "topic", "t", "", "Kafka topic (required)")
-	produceCmd.Flags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
+	produceCmd.Flags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file or protobuf descriptor set (.desc/.pb/.protoset)")
 	produceCmd.Flags().StringVarP(&messageType, "message-type", "m", "", "Protobuf message type (required)")
 	produceCmd.Flags().StringVarP(&produceKey, "key", "k", "", "Message key")
 	produceCmd.Flags().Int32VarP(&producePartition, "partition", "P", -1, "Specific partition to produce to (-1 for auto)")
