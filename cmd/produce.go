@@ -3,17 +3,12 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/HurSungYun/buf-kcat/internal/decoder"
+	"github.com/HurSungYun/buf-kcat/internal/kafka"
 	"github.com/spf13/cobra"
-	"github.com/twmb/franz-go/pkg/kgo"
-	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 var (
@@ -76,34 +71,21 @@ func runProduce(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Initialize proto decoder (also used for encoding)
-	dec, err := decoder.NewDecoder(protoDir, messageType)
+	// Initialize producer
+	producer, err := kafka.NewProducer(kafka.ProducerConfig{
+		Brokers:     brokers,
+		Topic:       topic,
+		ProtoPath:   protoDir,
+		MessageType: messageType,
+		Key:         produceKey,
+		Partition:   producePartition,
+		Verbose:     verbose,
+	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize decoder: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Loaded %d message types from %s\n", dec.MessageTypeCount(), protoDir)
-		fmt.Fprintf(os.Stderr, "Using message type: %s\n", messageType)
-	}
-
-	// Create Kafka producer client
-	opts := []kgo.Opt{
-		kgo.SeedBrokers(brokers...),
-		kgo.DefaultProduceTopic(topic),
-	}
-
-	if producePartition >= 0 {
-		opts = append(opts, kgo.RecordPartitioner(kgo.ManualPartitioner()))
-	}
-
-	client, err := kgo.NewClient(opts...)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create Kafka client: %v\n", err)
-		os.Exit(1)
-	}
-	defer client.Close()
+	defer producer.Close()
 
 	// Print connection status
 	fmt.Fprintf(os.Stderr, "Connected to Kafka brokers: %v\n", brokers)
@@ -143,43 +125,13 @@ func runProduce(cmd *cobra.Command, args []string) {
 			continue
 		}
 
-		// Parse JSON input
-		jsonData := []byte(line)
-
-		// Validate JSON
-		var jsonObj interface{}
-		if err := json.Unmarshal(jsonData, &jsonObj); err != nil {
-			fmt.Fprintf(os.Stderr, "Invalid JSON: %v\n", err)
-			continue
-		}
-
-		// Convert JSON to protobuf
-		protoBytes, err := encodeMessage(dec, messageType, jsonData)
+		// Produce via internal producer
+		r, err := producer.ProduceJSON(ctx, line)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to encode message: %v\n", err)
+			fmt.Fprintf(os.Stderr, "%v\n", err)
 			continue
 		}
-
-		// Create Kafka record
-		record := &kgo.Record{
-			Topic:     topic,
-			Value:     protoBytes,
-			Partition: producePartition,
-		}
-
-		if produceKey != "" {
-			record.Key = []byte(produceKey)
-		}
-
-		// Send message
-		result := client.ProduceSync(ctx, record)
-		if err := result.FirstErr(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to produce message: %v\n", err)
-			continue
-		}
-
 		messageCount++
-		r, _ := result.First()
 		fmt.Fprintf(os.Stderr, "Produced message %d to %s/%d@%d\n",
 			messageCount, r.Topic, r.Partition, r.Offset)
 
@@ -194,35 +146,4 @@ func runProduce(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Fprintf(os.Stderr, "\nProduced %d messages successfully\n", messageCount)
-}
-
-// encodeMessage converts JSON to protobuf bytes
-func encodeMessage(dec *decoder.Decoder, msgTypeName string, jsonData []byte) ([]byte, error) {
-	// Get the message type
-	msgTypes := dec.GetMessageTypes()
-	msgType, ok := msgTypes[msgTypeName]
-	if !ok {
-		return nil, fmt.Errorf("message type not found: %s", msgTypeName)
-	}
-
-	// Create a new message instance
-	msg := dynamicpb.NewMessage(msgType.Descriptor())
-
-	// Unmarshal JSON into the message
-	unmarshaler := protojson.UnmarshalOptions{
-		DiscardUnknown: false,
-		AllowPartial:   false,
-	}
-
-	if err := unmarshaler.Unmarshal(jsonData, msg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal JSON to proto: %w", err)
-	}
-
-	// Marshal to protobuf binary
-	protoBytes, err := proto.Marshal(msg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal proto: %w", err)
-	}
-
-	return protoBytes, nil
 }

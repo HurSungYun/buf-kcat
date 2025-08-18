@@ -2,18 +2,69 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/signal"
-	"strings"
-	"syscall"
 
-	"github.com/HurSungYun/buf-kcat/internal/decoder"
-	"github.com/HurSungYun/buf-kcat/internal/formatter"
+	"github.com/HurSungYun/buf-kcat/internal/kafka"
 	"github.com/spf13/cobra"
-	"github.com/twmb/franz-go/pkg/kgo"
 )
+
+var consumerCmd = &cobra.Command{
+	Use:   "consume",
+	Short: "Consume messages from Kafka topic (default command)",
+	Long: `Consume and decode protobuf messages from a Kafka topic.
+
+This is the default command when no subcommand is specified.
+
+Examples:
+  # Consume from topic
+  buf-kcat consume -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage
+  
+  # Or use without 'consume' (default command)
+  buf-kcat -b localhost:9092 -t my-topic -p buf.yaml -m mypackage.MyMessage`,
+	Run: runConsume,
+}
+
+func init() {
+	// Consumer-specific flags
+	consumerCmd.Flags().StringSliceVarP(&brokers, "brokers", "b", []string{"localhost:9092"}, "Kafka brokers (comma-separated)")
+	consumerCmd.Flags().StringVarP(&topic, "topic", "t", "", "Kafka topic (required)")
+	consumerCmd.Flags().StringVarP(&group, "group", "g", "buf-kcat", "Consumer group")
+	consumerCmd.Flags().StringVarP(&messageType, "message-type", "m", "", "Protobuf message type (required)")
+	consumerCmd.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format: json, json-compact, table, raw, pretty")
+	consumerCmd.Flags().StringVarP(&offset, "offset", "o", "end", "Start offset: beginning, end, stored, or timestamp:UNIX_MS")
+	consumerCmd.Flags().IntVarP(&count, "count", "c", 0, "Number of messages to consume (0 = unlimited)")
+	consumerCmd.Flags().BoolVar(&follow, "follow", false, "Continue consuming messages (like tail -f)")
+	consumerCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
+	consumerCmd.Flags().StringVarP(&protoDir, "proto", "p", "buf.yaml", "Path to buf.yaml file")
+	consumerCmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output")
+
+	_ = consumerCmd.MarkFlagRequired("topic")
+	_ = consumerCmd.MarkFlagRequired("message-type")
+
+	// Also add the same flags to root for backward compatibility
+	rootCmd.Flags().StringSliceVarP(&brokers, "brokers", "b", []string{"localhost:9092"}, "Kafka brokers (comma-separated)")
+	rootCmd.Flags().StringVarP(&topic, "topic", "t", "", "Kafka topic (required)")
+	rootCmd.Flags().StringVarP(&group, "group", "g", "buf-kcat", "Consumer group")
+	rootCmd.Flags().StringVarP(&messageType, "message-type", "m", "", "Protobuf message type (required)")
+	rootCmd.Flags().StringVarP(&outputFormat, "format", "f", "json", "Output format: json, json-compact, table, raw, pretty")
+	rootCmd.Flags().StringVarP(&offset, "offset", "o", "end", "Start offset: beginning, end, stored, or timestamp:UNIX_MS")
+	rootCmd.Flags().IntVarP(&count, "count", "c", 0, "Number of messages to consume (0 = unlimited)")
+	rootCmd.Flags().BoolVar(&follow, "follow", false, "Continue consuming messages (like tail -f)")
+	rootCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
+
+	// Mark required flags for root command as well
+	_ = rootCmd.MarkFlagRequired("topic")
+	_ = rootCmd.MarkFlagRequired("message-type")
+
+	// Set default command behavior
+	rootCmd.Run = func(cmd *cobra.Command, args []string) {
+		// If no subcommand is provided, run consume
+		runConsume(cmd, args)
+	}
+
+	rootCmd.AddCommand(consumerCmd)
+}
 
 func runConsume(cmd *cobra.Command, args []string) {
 	// Validate required flags
@@ -28,168 +79,27 @@ func runConsume(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	// Initialize proto decoder
-	dec, err := decoder.NewDecoder(protoDir, messageType)
+	consumer, err := kafka.NewConsumer(kafka.ConsumerConfig{
+		Brokers:      brokers,
+		Group:        group,
+		Topic:        topic,
+		ProtoPath:    protoDir,
+		MessageType:  messageType,
+		OutputFormat: outputFormat,
+		Offset:       offset,
+		Count:        count,
+		Follow:       follow,
+		KeyFilter:    keyFilter,
+		Verbose:      verbose,
+	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize decoder: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+	defer consumer.Close()
 
-	if verbose {
-		fmt.Fprintf(os.Stderr, "Loaded %d message types from %s\n", dec.MessageTypeCount(), protoDir)
-		fmt.Fprintf(os.Stderr, "Using message type: %s\n", messageType)
-	}
-
-	// Initialize formatter
-	fmtr, err := formatter.New(outputFormat)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Invalid output format: %v\n", err)
+	if err := consumer.Run(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
-	}
-
-	// Create Kafka client
-	opts := []kgo.Opt{
-		kgo.SeedBrokers(brokers...),
-		kgo.ConsumerGroup(group),
-		kgo.ConsumeTopics(topic),
-		kgo.DisableAutoCommit(),
-	}
-
-	// Set offset
-	switch {
-	case strings.HasPrefix(offset, "timestamp:"):
-		// Parse timestamp offset
-		// For simplicity, using end for now
-		opts = append(opts, kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()))
-	case offset == "beginning":
-		opts = append(opts, kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
-	case offset == "stored":
-		// Use stored offset (default behavior)
-	default: // "end"
-		opts = append(opts, kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()))
-	}
-
-	client, err := kgo.NewClient(opts...)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to create Kafka client: %v\n", err)
-		os.Exit(1)
-	}
-	defer client.Close()
-
-	// Set up signal handling
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		if verbose {
-			fmt.Fprintf(os.Stderr, "\nShutting down...\n")
-		}
-		cancel()
-	}()
-
-	// Print connection status
-	fmt.Fprintf(os.Stderr, "Connected to Kafka brokers: %v\n", brokers)
-	fmt.Fprintf(os.Stderr, "Starting to consume from topic '%s' (group: %s, offset: %s)\n", topic, group, offset)
-	if messageType != "" {
-		fmt.Fprintf(os.Stderr, "Message type: %s\n", messageType)
-	}
-	if keyFilter != "" {
-		fmt.Fprintf(os.Stderr, "Filtering by key: %s\n", keyFilter)
-	}
-	if count > 0 {
-		fmt.Fprintf(os.Stderr, "Will consume %d messages\n", count)
-	}
-	if follow {
-		fmt.Fprintf(os.Stderr, "Following topic (press Ctrl+C to stop)...\n")
-	}
-	fmt.Fprintf(os.Stderr, "Waiting for messages...\n\n")
-
-	// Consume messages
-	messageCount := 0
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		fetches := client.PollFetches(ctx)
-		if fetches.IsClientClosed() {
-			return
-		}
-
-		if err := fetches.Err(); err != nil {
-			fmt.Fprintf(os.Stderr, "Fetch error: %v\n", err)
-			continue
-		}
-
-		fetches.EachPartition(func(p kgo.FetchTopicPartition) {
-			for _, record := range p.Records {
-				// Apply key filter if specified
-				if keyFilter != "" && string(record.Key) != keyFilter {
-					continue
-				}
-
-				// Decode the message
-				decoded, msgType, err := dec.Decode(record.Value)
-				if err != nil {
-					if verbose {
-						fmt.Fprintf(os.Stderr, "Failed to decode message at offset %d: %v\n", record.Offset, err)
-					}
-					// Output raw message on decode failure
-					output := formatter.Message{
-						Topic:     record.Topic,
-						Partition: record.Partition,
-						Offset:    record.Offset,
-						Key:       string(record.Key),
-						Timestamp: record.Timestamp,
-						Error:     err.Error(),
-						RawValue:  record.Value,
-					}
-					if err := fmtr.Format(output); err != nil {
-						fmt.Fprintf(os.Stderr, "Failed to format output: %v\n", err)
-					}
-				} else {
-					// Successfully decoded
-					var value any
-					if err := json.Unmarshal(decoded, &value); err != nil {
-						value = string(decoded)
-					}
-
-					output := formatter.Message{
-						Topic:       record.Topic,
-						Partition:   record.Partition,
-						Offset:      record.Offset,
-						Key:         string(record.Key),
-						Timestamp:   record.Timestamp,
-						MessageType: msgType,
-						Value:       value,
-					}
-					if err := fmtr.Format(output); err != nil {
-						fmt.Fprintf(os.Stderr, "Failed to format output: %v\n", err)
-					}
-				}
-
-				messageCount++
-				if count > 0 && messageCount >= count {
-					return
-				}
-			}
-		})
-
-		if count > 0 && messageCount >= count {
-			break
-		}
-
-		// If not following and we've consumed existing messages, exit
-		if !follow {
-			// Check if we have more messages
-			if fetches.NumRecords() == 0 {
-				break
-			}
-		}
 	}
 }
