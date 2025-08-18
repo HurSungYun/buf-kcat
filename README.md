@@ -45,10 +45,11 @@ Download pre-built binaries from the [releases page](https://github.com/HurSungY
 
 ### Basic Usage
 
-buf-kcat requires a `buf.yaml` configuration file for proto compilation. By default, output is in JSON format for easy integration with pipes and other tools:
+buf-kcat requires a `buf.yaml` configuration file for proto compilation, a topic name (`-t`), and a message type (`-m`). By default, output is in JSON format for easy integration with pipes and other tools:
 
 ```bash
 # Consume from topic (outputs JSON by default)
+# Both -t (topic) and -m (message-type) are required
 buf-kcat -b localhost:9092 -t my-topic -p /path/to/buf.yaml -m mypackage.MyMessage
 
 # Pipe JSON output to jq for processing
@@ -227,8 +228,8 @@ metrics.Summary
 ```
 Flags:
   -b, --brokers strings       Kafka brokers (default [localhost:9092])
-  -t, --topic string          Kafka topic (required)
-  -m, --message-type string   Protobuf message type (required)
+  -t, --topic string          Kafka topic name (REQUIRED)
+  -m, --message-type string   Protobuf message type (REQUIRED)
   -g, --group string          Consumer group (default "buf-kcat")
   -p, --proto string          Path to buf.yaml file (default "buf.yaml")
   -f, --format string         Output format: json, json-compact, table, raw, pretty (default "json")

@@ -18,7 +18,6 @@ var (
 	count        int
 	follow       bool
 	verbose      bool
-	partitions   []int32
 	keyFilter    string
 )
 
