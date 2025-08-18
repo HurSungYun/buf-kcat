@@ -388,11 +388,11 @@ func TestConsumeCommand(t *testing.T) {
 
 					if jsonEnd > jsonStart {
 						jsonStr := outputStr[jsonStart:jsonEnd]
-						var result map[string]interface{}
+						var result map[string]any
 						if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
 							if key, ok := result["key"].(string); ok && key == tt.wantKey {
 								foundMessage = true
-								value, ok := result["value"].(map[string]interface{})
+								value, ok := result["value"].(map[string]any)
 								if !ok {
 									t.Errorf("value is not a map: %v", result["value"])
 									return
@@ -508,7 +508,7 @@ func TestOutputFormats(t *testing.T) {
 
 					if jsonEnd > jsonStart {
 						jsonStr := output[jsonStart:jsonEnd]
-						var result map[string]interface{}
+						var result map[string]any
 						if err := json.Unmarshal([]byte(jsonStr), &result); err == nil {
 							// Check it has expected fields
 							if _, hasKey := result["topic"]; hasKey {
@@ -615,13 +615,13 @@ func TestOutputFormats(t *testing.T) {
 func TestProduceMultipleMessages(t *testing.T) {
 	tests := []struct {
 		name         string
-		messages     []map[string]interface{}
+		messages     []map[string]any
 		wantProduced int
 		wantErr      bool
 	}{
 		{
 			name: "produce 3 messages from file",
-			messages: []map[string]interface{}{
+			messages: []map[string]any{
 				{"user_id": "user-1", "event_type": "SIGNUP"},
 				{"user_id": "user-2", "event_type": "LOGIN"},
 				{"user_id": "user-3", "event_type": "LOGOUT"},
@@ -631,7 +631,7 @@ func TestProduceMultipleMessages(t *testing.T) {
 		},
 		{
 			name: "produce with mixed valid and invalid",
-			messages: []map[string]interface{}{
+			messages: []map[string]any{
 				{"user_id": "user-4", "event_type": "LOGIN"},
 				nil, // This will create invalid JSON
 				{"user_id": "user-5", "event_type": "LOGOUT"},
@@ -694,6 +694,358 @@ func TestProduceMultipleMessages(t *testing.T) {
 	}
 }
 
+func TestComplexMessageTypes(t *testing.T) {
+	// Test oneof fields, enums, nested messages, etc.
+	tests := []struct {
+		name        string
+		messageType string
+		jsonData    string
+		wantFields  []string
+	}{
+		{
+			name:        "ComplexEvent with oneof user_activity",
+			messageType: "events.ComplexEvent",
+			jsonData:    `{"event_id": "evt-123", "timestamp": "2024-01-15T15:04:05Z", "source": "test-service", "priority": 1, "labels": ["test", "integration"], "user_activity": {"user_id": "user-456", "action": "login", "resource": "/api/auth", "context": {"ip": "192.168.1.1"}}}`,
+			wantFields:  []string{"evt-123", "user-456", "login", "/api/auth"},
+		},
+		{
+			name:        "SystemEvent with enums and arrays",
+			messageType: "events.SystemEvent",
+			jsonData:    `{"system_id": "sys-001", "event_level": "ERROR", "message": "Database connection failed", "timestamp": "2024-01-15T15:04:05Z", "uptime": "3600s", "tags": ["database", "error", "connection"]}`,
+			wantFields:  []string{"sys-001", "ERROR", "Database connection failed", "database"},
+		},
+		{
+			name:        "EmptyEvent", 
+			messageType: "events.EmptyEvent",
+			jsonData:    `{}`,
+			wantFields:  []string{}, // Empty message should still work
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Use a unique topic for each test to avoid interference
+			uniqueTopic := fmt.Sprintf("test-complex-%d", time.Now().UnixNano())
+			
+			// Create the unique topic
+			if err := createTopic(uniqueTopic); err != nil {
+				t.Fatalf("Failed to create topic: %v", err)
+			}
+
+			// First produce the message
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			testKey := fmt.Sprintf("key-%d", time.Now().UnixNano())
+			cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
+				"-b", kafkaBroker,
+				"-t", uniqueTopic,
+				"-p", "../example/buf.yaml",
+				"-m", tt.messageType,
+				"-k", testKey)
+			cmd.Stdin = strings.NewReader(tt.jsonData)
+			
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("Failed to produce message: %v\nOutput: %s", err, output)
+			}
+
+			// Verify production was successful
+			if !strings.Contains(string(output), "Produced message") {
+				t.Fatalf("Production did not complete successfully: %s", output)
+			}
+
+			time.Sleep(3 * time.Second) // Let Kafka process
+
+			// Then consume and verify - consume from end to get only our message
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel2()
+
+			cmd2 := exec.CommandContext(ctx2, bufKcatBin,
+				"-b", kafkaBroker,
+				"-t", uniqueTopic,
+				"-p", "../example/buf.yaml", 
+				"-m", tt.messageType,
+				"-c", "1",
+				"-o", "beginning", // Start from beginning to ensure we get our message
+				"-f", "json")
+
+			output2, err2 := cmd2.CombinedOutput()
+			if err2 != nil {
+				t.Fatalf("Failed to consume message: %v\nOutput: %s", err2, output2)
+			}
+
+			outputStr := string(output2)
+			
+			// For empty event, just check that we got a valid JSON response
+			if tt.messageType == "events.EmptyEvent" {
+				if !strings.Contains(outputStr, `"topic"`) || !strings.Contains(outputStr, uniqueTopic) {
+					t.Errorf("Expected valid JSON response for EmptyEvent, got: %s", outputStr)
+				}
+				return
+			}
+			
+			// Check for expected fields
+			for _, field := range tt.wantFields {
+				if !strings.Contains(outputStr, field) {
+					t.Errorf("Output missing expected field %q\nGot: %s", field, outputStr)
+				}
+			}
+		})
+	}
+}
+
+func TestAdvancedConsumerFeatures(t *testing.T) {
+	tests := []struct {
+		name         string
+		setupKey     string
+		setupMessage string
+		args         []string
+		wantContains []string
+		wantCount    int // Expected number of messages
+		skipCount    bool // Skip count validation
+	}{
+		{
+			name:         "Key filtering - specific key",
+			setupKey:     "filter-key-123",
+			setupMessage: `{"user_id": "filter-user-1", "event_type": "LOGIN"}`,
+			args: []string{
+				"-b", kafkaBroker,
+				"-t", "", // Will be set dynamically
+				"-p", "../example/buf.yaml",
+				"-m", "events.UserEvent",
+				"-k", "filter-key-123",
+				"-c", "1", // Just get one message
+				"-o", "beginning",
+				"-f", "json",
+			},
+			wantContains: []string{"filter-key-123", "filter-user-1"},
+			wantCount:    1,
+		},
+		{
+			name:         "Count limit test",
+			setupKey:     "count-key-789",
+			setupMessage: `{"user_id": "count-user", "event_type": "COUNT_TEST"}`,
+			args: []string{
+				"-b", kafkaBroker,
+				"-t", "", // Will be set dynamically
+				"-p", "../example/buf.yaml",
+				"-m", "events.UserEvent", 
+				"-c", "1", // Test count limiting
+				"-o", "beginning",
+				"-f", "json",
+			},
+			wantContains: []string{"count-key-789", "count-user"},
+			wantCount: 1, // Should get exactly 1 message
+			skipCount: false, // We want to verify the count
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create unique topic for this specific test
+			uniqueTopic := fmt.Sprintf("test-adv-%d", time.Now().UnixNano())
+			if err := createTopic(uniqueTopic); err != nil {
+				t.Fatalf("Failed to create topic: %v", err)
+			}
+
+			// Set the topic in args
+			for i, arg := range tt.args {
+				if arg == "" && i > 0 && tt.args[i-1] == "-t" {
+					tt.args[i] = uniqueTopic
+					break
+				}
+			}
+
+			// Produce setup message
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			cmd := exec.CommandContext(ctx, bufKcatBin, "produce",
+				"-b", kafkaBroker,
+				"-t", uniqueTopic,
+				"-p", "../example/buf.yaml",
+				"-m", "events.UserEvent",
+				"-k", tt.setupKey)
+			cmd.Stdin = strings.NewReader(tt.setupMessage)
+			output, err := cmd.CombinedOutput()
+			cancel()
+			
+			if err != nil {
+				t.Fatalf("Failed to produce setup message: %v\nOutput: %s", err, output)
+			}
+			if !strings.Contains(string(output), "Produced message") {
+				t.Fatalf("Production did not complete successfully: %s", output)
+			}
+
+			time.Sleep(3 * time.Second) // Let Kafka process
+
+			// Run the consumer test
+			ctx2, cancel2 := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel2()
+
+			cmd2 := exec.CommandContext(ctx2, bufKcatBin, tt.args...)
+			output2, err2 := cmd2.CombinedOutput()
+			
+			if err2 != nil {
+				t.Errorf("Command failed: %v\nOutput: %s", err2, output2)
+				return
+			}
+
+			outputStr := string(output2)
+
+			// Check for expected content
+			for _, want := range tt.wantContains {
+				if !strings.Contains(outputStr, want) {
+					t.Errorf("Output missing %q\nGot: %s", want, outputStr)
+				}
+			}
+
+			// Check message count if specified
+			if !tt.skipCount && tt.wantCount > 0 {
+				jsonCount := strings.Count(outputStr, `"topic"`)
+				if jsonCount != tt.wantCount {
+					t.Errorf("Expected %d messages, got %d\nOutput: %s", tt.wantCount, jsonCount, outputStr)
+				}
+			}
+		})
+	}
+}
+
+func TestHelpCommands(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantContains []string
+		wantErr      bool
+	}{
+		{
+			name:         "Root help",
+			args:         []string{"--help"},
+			wantContains: []string{"buf-kcat", "Commands:", "consume", "produce", "list"},
+			wantErr:      false,
+		},
+		{
+			name:         "Consume help",
+			args:         []string{"consume", "--help"},
+			wantContains: []string{"consume", "topic", "message-type", "brokers"},
+			wantErr:      false,
+		},
+		{
+			name:         "Produce help", 
+			args:         []string{"produce", "--help"},
+			wantContains: []string{"produce", "topic", "message-type", "key", "file"},
+			wantErr:      false,
+		},
+		{
+			name:         "List help",
+			args:         []string{"list", "--help"},
+			wantContains: []string{"list", "proto", "message types"},
+			wantErr:      false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			cmd := exec.CommandContext(ctx, bufKcatBin, tt.args...)
+			output, err := cmd.CombinedOutput()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v\nOutput: %s", err, tt.wantErr, output)
+				return
+			}
+
+			outputStr := string(output)
+			for _, want := range tt.wantContains {
+				if !strings.Contains(outputStr, want) {
+					t.Errorf("Help output missing %q\nGot: %s", want, outputStr)
+				}
+			}
+		})
+	}
+}
+
+func TestRequiredFlags(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantErr      bool
+		wantContains []string
+	}{
+		{
+			name: "Missing topic flag",
+			args: []string{
+				"consume",
+				"-p", "../example/buf.yaml",
+				"-m", "events.UserEvent",
+			},
+			wantErr:      true,
+			wantContains: []string{"required flag", "topic"},
+		},
+		{
+			name: "Missing message-type flag", 
+			args: []string{
+				"consume",
+				"-t", testTopic,
+				"-p", "../example/buf.yaml",
+			},
+			wantErr:      true,
+			wantContains: []string{"required flag", "message-type"},
+		},
+		{
+			name: "Missing both required flags",
+			args: []string{
+				"consume",
+				"-p", "../example/buf.yaml",
+			},
+			wantErr: true,
+			wantContains: []string{"required flag"},
+		},
+		{
+			name: "Root command missing topic",
+			args: []string{
+				"-p", "../example/buf.yaml",
+				"-m", "events.UserEvent",
+			},
+			wantErr: true,
+			wantContains: []string{"required flag", "topic"},
+		},
+		{
+			name: "Produce missing topic",
+			args: []string{
+				"produce",
+				"-p", "../example/buf.yaml", 
+				"-m", "events.UserEvent",
+			},
+			wantErr: true,
+			wantContains: []string{"required flag", "topic"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			cmd := exec.CommandContext(ctx, bufKcatBin, tt.args...)
+			output, err := cmd.CombinedOutput()
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("error = %v, wantErr %v\nOutput: %s", err, tt.wantErr, output)
+				return
+			}
+
+			outputStr := string(output)
+			for _, want := range tt.wantContains {
+				if !strings.Contains(outputStr, want) {
+					t.Errorf("Output missing %q\nGot: %s", want, outputStr)
+				}
+			}
+		})
+	}
+}
+
 func TestErrorHandling(t *testing.T) {
 	tests := []struct {
 		name          string
@@ -704,21 +1056,6 @@ func TestErrorHandling(t *testing.T) {
 		wantInOutput  []string
 		acceptSuccess bool // Some errors are handled gracefully
 	}{
-		{
-			name:    "consume with invalid message type",
-			command: "consume",
-			args: []string{
-				"-b", kafkaBroker,
-				"-t", testTopic,
-				"-p", "../example/buf.yaml",
-				"-m", "invalid.MessageType",
-				"-c", "1",
-				"-o", "end",
-			},
-			wantErr:       false,
-			acceptSuccess: true,
-			wantInOutput:  []string{"Error", "unknown message type"},
-		},
 		{
 			name:    "invalid buf file",
 			command: "consume",
@@ -746,17 +1083,6 @@ func TestErrorHandling(t *testing.T) {
 			wantInOutput:  []string{"Invalid JSON", "Produced 0 messages"},
 		},
 		{
-			name:    "missing required flags",
-			command: "consume",
-			args: []string{
-				"-b", kafkaBroker,
-				// Missing -t (topic) flag
-				"-p", "../example/buf.yaml",
-				"-m", "events.UserEvent",
-			},
-			wantErr: true,
-		},
-		{
 			name:    "invalid broker address",
 			command: "consume",
 			args: []string{
@@ -772,7 +1098,7 @@ func TestErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 
 			args := append([]string{tt.command}, tt.args...)

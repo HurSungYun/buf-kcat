@@ -3,9 +3,29 @@ syntax = "proto3";
 package events;
 
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/any.proto";
 
 option go_package = "github.com/HurSungYun/buf-kcat/test/example/proto/events";
 
+// Enum definitions
+enum EventLevel {
+  EVENT_LEVEL_UNSPECIFIED = 0;
+  INFO = 1;
+  WARN = 2;
+  ERROR = 3;
+  CRITICAL = 4;
+}
+
+enum PaymentMethod {
+  PAYMENT_METHOD_UNSPECIFIED = 0;
+  CREDIT_CARD = 1;
+  DEBIT_CARD = 2;
+  PAYPAL = 3;
+  BANK_TRANSFER = 4;
+}
+
+// Basic message types
 message UserEvent {
   string user_id = 1;
   string event_type = 2;
@@ -15,9 +35,11 @@ message UserEvent {
 
 message SystemEvent {
   string system_id = 1;
-  string event_level = 2;
+  EventLevel event_level = 2;
   string message = 3;
   google.protobuf.Timestamp timestamp = 4;
+  google.protobuf.Duration uptime = 5;
+  repeated string tags = 6;
 }
 
 message OrderEvent {
@@ -27,10 +49,131 @@ message OrderEvent {
   double total_amount = 4;
   repeated OrderItem items = 5;
   google.protobuf.Timestamp created_at = 6;
+  PaymentMethod payment_method = 7;
 }
 
 message OrderItem {
   string product_id = 1;
   int32 quantity = 2;
   double price = 3;
+  map<string, string> attributes = 4;
+}
+
+// Complex message with oneof fields
+message ComplexEvent {
+  string event_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  
+  // Oneof field demonstrating different event types
+  oneof event_data {
+    UserActivity user_activity = 10;
+    SystemMetric system_metric = 11;
+    ErrorDetails error_details = 12;
+    CustomData custom_data = 13;
+  }
+  
+  // Optional fields
+  string source = 3;
+  int32 priority = 4;
+  repeated string labels = 5;
+}
+
+message UserActivity {
+  string user_id = 1;
+  string action = 2;
+  string resource = 3;
+  map<string, string> context = 4;
+}
+
+message SystemMetric {
+  string metric_name = 1;
+  double value = 2;
+  string unit = 3;
+  map<string, double> dimensions = 4;
+}
+
+message ErrorDetails {
+  int32 error_code = 1;
+  string error_message = 2;
+  string stack_trace = 3;
+  repeated string affected_components = 4;
+}
+
+message CustomData {
+  google.protobuf.Any payload = 1;
+  string data_type = 2;
+  bytes raw_data = 3;
+}
+
+// Nested message structure
+message NestedEvent {
+  string event_id = 1;
+  EventMetadata metadata = 2;
+  EventPayload payload = 3;
+}
+
+message EventMetadata {
+  string version = 1;
+  string schema = 2;
+  google.protobuf.Timestamp created_at = 3;
+  EventSource source = 4;
+}
+
+message EventSource {
+  string service_name = 1;
+  string instance_id = 2;
+  string region = 3;
+}
+
+message EventPayload {
+  oneof data {
+    string text_data = 1;
+    bytes binary_data = 2;
+    StructuredData structured_data = 3;
+  }
+}
+
+message StructuredData {
+  repeated KeyValue pairs = 1;
+  repeated NestedObject objects = 2;
+}
+
+message KeyValue {
+  string key = 1;
+  string value = 2;
+}
+
+message NestedObject {
+  string name = 1;
+  repeated KeyValue properties = 2;
+  repeated NestedObject children = 3;
+}
+
+// Message with all primitive types
+message PrimitiveTypesEvent {
+  string string_field = 1;
+  int32 int32_field = 2;
+  int64 int64_field = 3;
+  uint32 uint32_field = 4;
+  uint64 uint64_field = 5;
+  float float_field = 6;
+  double double_field = 7;
+  bool bool_field = 8;
+  bytes bytes_field = 9;
+  repeated string string_array = 10;
+  repeated int32 int_array = 11;
+  repeated bool bool_array = 12;
+}
+
+// Empty message for testing
+message EmptyEvent {
+  // Intentionally empty
+}
+
+// Message with optional fields and defaults
+message OptionalFieldsEvent {
+  string required_field = 1;
+  string optional_field = 2;
+  int32 optional_number = 3;
+  bool optional_flag = 4;
 }
