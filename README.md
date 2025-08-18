@@ -81,19 +81,21 @@ buf-kcat supports two ways to provide protobuf definitions:
 buf-kcat -t my-topic -p buf.yaml -m mypackage.MyMessage
 ```
 
-#### 2. Protobuf Descriptor Set Files
+#### 2. Buf Image / Protobuf Descriptor Set Files (No External Commands)
 ```bash
-# Generate descriptor set from buf.yaml
+# Generate buf image from buf.yaml
 buf build -o schema.desc
 
-# Or generate from protoc
+# Or generate descriptor set from protoc
 protoc --descriptor_set_out=schema.desc --include_imports *.proto
 
-# Use descriptor set directly (no buf dependency required)
+# Use buf image directly (no buf dependency required, no external commands executed)
 buf-kcat -t my-topic -p schema.desc -m mypackage.MyMessage
 ```
 
-**Supported descriptor set extensions:** `.desc`, `.pb`, `.protoset`, or any binary file containing a protobuf descriptor set.
+**Supported formats:** Buf images (`.desc`), protobuf descriptor sets (`.pb`, `.protoset`), or any binary file containing compiled protobuf definitions.
+
+**🔒 Security Benefit:** When using buf images/descriptor sets, buf-kcat does **not execute any external commands** - it loads protobuf definitions directly from the pre-compiled binary file.
 
 ### Producer Mode
 
@@ -394,8 +396,8 @@ Waiting for messages...
 ## How It Works
 
 1. **Proto Loading**: 
-   - **buf.yaml mode**: Validates the provided `buf.yaml` file exists and executes `buf build` command to compile all protos with dependencies (**Security Note**: This involves spawning an external process)
-   - **Descriptor set mode**: Directly loads pre-compiled protobuf descriptor sets (`.desc`, `.pb`, `.protoset` files) - no external dependencies required
+   - **buf.yaml mode**: Validates the provided `buf.yaml` file exists and executes `buf build` command to compile all protos with dependencies (**Security Note**: This involves spawning an external `buf` process)
+   - **Buf image/descriptor set mode**: Directly loads pre-compiled buf images or protobuf descriptor sets (`.desc`, `.pb`, `.protoset` files) - **NO external commands executed**, making it safer for production/restricted environments
    - Automatically detects input type based on file extension and content
 
 2. **Message Decoding**:
