@@ -83,7 +83,7 @@ func (p *Producer) ProduceJSON(ctx context.Context, jsonLine string) (*kgo.Recor
 
 	var jsonObj interface{}
 	if err := json.Unmarshal([]byte(jsonLine), &jsonObj); err != nil {
-		return nil, fmt.Errorf("invalid JSON: %w", err)
+		return nil, fmt.Errorf("Invalid JSON: %w", err)
 	}
 
 	protoBytes, err := encodeMessage(p.decoder, p.messageType, []byte(jsonLine))
