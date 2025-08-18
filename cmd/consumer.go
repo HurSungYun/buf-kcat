@@ -47,6 +47,10 @@ func init() {
 	rootCmd.Flags().IntVarP(&count, "count", "c", 0, "Number of messages to consume (0 = unlimited)")
 	rootCmd.Flags().BoolVar(&follow, "follow", false, "Continue consuming messages (like tail -f)")
 	rootCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
+	
+	// Mark required flags for root command as well
+	rootCmd.MarkFlagRequired("topic")
+	rootCmd.MarkFlagRequired("message-type")
 
 	// Set default command behavior
 	rootCmd.Run = func(cmd *cobra.Command, args []string) {

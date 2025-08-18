@@ -16,6 +16,18 @@ import (
 )
 
 func runConsume(cmd *cobra.Command, args []string) {
+	// Validate required flags
+	if topic == "" {
+		fmt.Fprintf(os.Stderr, "Error: topic is required\n")
+		fmt.Fprintf(os.Stderr, "Usage: buf-kcat -t <topic> -m <message-type> [options]\n")
+		os.Exit(1)
+	}
+	if messageType == "" {
+		fmt.Fprintf(os.Stderr, "Error: message-type is required\n")
+		fmt.Fprintf(os.Stderr, "Usage: buf-kcat -t <topic> -m <message-type> [options]\n")
+		os.Exit(1)
+	}
+
 	// Initialize proto decoder
 	dec, err := decoder.NewDecoder(protoDir, messageType)
 	if err != nil {
