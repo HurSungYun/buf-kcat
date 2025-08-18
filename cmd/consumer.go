@@ -47,7 +47,7 @@ func init() {
 	rootCmd.Flags().IntVarP(&count, "count", "c", 0, "Number of messages to consume (0 = unlimited)")
 	rootCmd.Flags().BoolVar(&follow, "follow", false, "Continue consuming messages (like tail -f)")
 	rootCmd.Flags().StringVarP(&keyFilter, "key", "k", "", "Filter by message key (exact match)")
-	
+
 	// Mark required flags for root command as well
 	_ = rootCmd.MarkFlagRequired("topic")
 	_ = rootCmd.MarkFlagRequired("message-type")
