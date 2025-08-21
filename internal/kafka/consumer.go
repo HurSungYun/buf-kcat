@@ -64,12 +64,14 @@ func NewConsumer(cfg ConsumerConfig) (*Consumer, error) {
 	switch {
 	case strings.HasPrefix(cfg.Offset, "timestamp:"):
 		// For simplicity, using end for now
+		fmt.Fprintf(os.Stderr, "Warning: timestamp offset not implemented, falling back to 'end'\n")
 		opts = append(opts, kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()))
 	case cfg.Offset == "beginning":
 		opts = append(opts, kgo.ConsumeResetOffset(kgo.NewOffset().AtStart()))
 	case cfg.Offset == "stored":
 		// default behavior
 	default: // "end"
+		fmt.Fprintf(os.Stderr, "Info: using default offset 'end'\n")
 		opts = append(opts, kgo.ConsumeResetOffset(kgo.NewOffset().AtEnd()))
 	}
 
